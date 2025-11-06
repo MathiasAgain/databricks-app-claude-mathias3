@@ -51,7 +51,7 @@ export function SuggestedQuestions({
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 pt-4">
-          {[1, 2, 3, 4].map((i) => (
+          {[1, 2, 3].map((i) => (
             <Skeleton key={i} className="h-12 w-full rounded-lg" />
           ))}
         </CardContent>
