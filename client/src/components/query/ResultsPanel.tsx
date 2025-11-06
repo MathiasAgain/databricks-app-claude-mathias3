@@ -5,19 +5,24 @@
  * Combines ResultsTable and AI insights in a unified panel.
  */
 
+import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ResultsTable } from './ResultsTable'
 import { ChatInterface } from './ChatInterface'
+import { DataChart } from '@/components/charts/DataChart'
 import type { AskQuestionResponse } from '@/types/genie'
 
 interface ResultsPanelProps {
   result: AskQuestionResponse
   onFollowupClick?: (question: string) => void
+  isProcessing?: boolean
 }
 
-export function ResultsPanel({ result, onFollowupClick }: ResultsPanelProps) {
+export function ResultsPanel({ result, onFollowupClick, isProcessing }: ResultsPanelProps) {
+  const [showChart, setShowChart] = useState(true)
+
   return (
     <div className="space-y-6 fade-in">
       {/* Question and Genie's Answer */}
@@ -117,6 +122,43 @@ export function ResultsPanel({ result, onFollowupClick }: ResultsPanelProps) {
             </Badge>
           </div>
         </CardContent>
+      </Card>
+
+      {/* Data Visualization */}
+      <Card className="border-2 border-accent/20 shadow-xl bg-gradient-to-br from-card to-accent/5">
+        <CardHeader className="border-b border-accent/10 bg-accent/5">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-xl flex items-center gap-3">
+              <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+              </div>
+              <span className="text-accent">Data Visualization</span>
+            </CardTitle>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowChart(!showChart)}
+              className="hover:bg-accent/10"
+            >
+              {showChart ? (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              )}
+            </Button>
+          </div>
+        </CardHeader>
+        {showChart && (
+          <CardContent className="pt-6">
+            <DataChart data={result.results} />
+          </CardContent>
+        )}
       </Card>
 
       {/* Results Table */}
