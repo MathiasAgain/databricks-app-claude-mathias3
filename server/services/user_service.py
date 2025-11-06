@@ -4,6 +4,23 @@ from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.iam import User
 
 
+def get_workspace_client() -> WorkspaceClient:
+  """Get a Databricks workspace client instance.
+
+  This function is used as a FastAPI dependency to provide
+  a WorkspaceClient to route handlers.
+
+  In Databricks Apps, the SDK automatically uses the app's service principal
+  credentials when no explicit configuration is provided.
+
+  Returns:
+      WorkspaceClient: Configured Databricks workspace client
+  """
+  # In Databricks Apps environment, WorkspaceClient() automatically uses
+  # the app's service principal via environment variables
+  return WorkspaceClient()
+
+
 class UserService:
   """Service for managing Databricks user operations."""
 

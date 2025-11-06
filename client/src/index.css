@@ -4,35 +4,43 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Orkla Professional & Corporate Theme */
+    --background: 10 85.7% 97.3%; /* #fef4f2 - Orkla Red 50 Background */
+    --foreground: 329 100% 11.6%; /* #3B001E - Orkla Snacks Purple 700 (Primary Dark) */
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 331 40.6% 27.1%; /* #612944 - Orkla Snacks Purple 500 */
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 329 100% 11.6%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 331 40.6% 27.1%; /* #612944 - Orkla Snacks Purple 500 */
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222.2 84% 4.9%;
+    --secondary: 335 38.8% 40.4%; /* #8f3f60 - Orkla Red 300 */
+    --secondary-foreground: 0 0% 100%;
 
-    --muted: 210 40% 96%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 4 100% 93.9%; /* #ffe2e0 - Orkla Red 50 */
+    --muted-foreground: 335 38.8% 40.4%;
 
-    --accent: 210 40% 96%;
-    --accent-foreground: 222.2 84% 4.9%;
+    --accent: 0 75.8% 62.7%; /* #e85858 - Orkla Red 200 */
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 75.8% 62.7%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 4 100% 93.9%;
+    --input: 4 100% 93.9%;
+    --ring: 331 40.6% 27.1%;
 
-    --radius: 0.5rem;
+    --radius: 0.75rem;
+
+    /* Orkla brand color extensions */
+    --orkla-purple-dark: 329 100% 11.6%; /* #3B001E */
+    --orkla-purple: 331 40.6% 27.1%; /* #612944 */
+    --orkla-red: 335 38.8% 40.4%; /* #8f3f60 */
+    --orkla-red-light: 0 75.8% 62.7%; /* #e85858 */
+    --orkla-red-lighter: 9 84% 80.8%; /* #f8b0a4 */
   }
 
   .dark {
@@ -72,5 +80,77 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+/* Orkla Professional Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse-subtle {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+/* Loading skeleton animation */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--muted)) 0%,
+    hsl(var(--muted) / 0.8) 50%,
+    hsl(var(--muted)) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+/* Smooth transitions for all interactive elements */
+@layer components {
+  .smooth-transition {
+    transition: all 0.2s ease-in-out;
+  }
+
+  .fade-in {
+    animation: fadeIn 0.4s ease-out;
+  }
+
+  .slide-in {
+    animation: slideIn 0.3s ease-out;
+  }
+
+  .pulse-subtle {
+    animation: pulse-subtle 2s ease-in-out infinite;
   }
 }

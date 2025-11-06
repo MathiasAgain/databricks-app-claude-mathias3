@@ -1,0 +1,94 @@
+/**
+ * Analytics Page - Main application page
+ *
+ * Combines dashboard, query input, and results in a unified interface.
+ * This is the primary page for the Nielsen Sales Analytics Assistant.
+ */
+
+import { useState, useCallback } from 'react'
+import { QueryInput } from '@/components/query/QueryInput'
+import { SuggestedQuestions } from '@/components/query/SuggestedQuestions'
+import { ResultsPanel } from '@/components/query/ResultsPanel'
+import { useAskQuestion, useChatWithClaude } from '@/hooks/useGenie'
+import type { AskQuestionResponse } from '@/types/genie'
+import type { ChatRequest } from '@/types/claude'
+
+export default function AnalyticsPage() {
+  const [currentResult, setCurrentResult] = useState<AskQuestionResponse | null>(null)
+  const [conversationHistory, setConversationHistory] = useState<Array<{role: string, content: string}>>([])
+  const { mutate: askQuestion } = useAskQuestion()
+  const { mutate: chatWithClaude, isPending: isChatPending } = useChatWithClaude()
+
+  const handleQueryComplete = useCallback((result: AskQuestionResponse) => {
+    setCurrentResult(result)
+    // Reset conversation when new query is run
+    setConversationHistory([])
+  }, [])
+
+  const handleFollowupClick = useCallback((question: string) => {
+    if (!currentResult) return
+
+    // Use Claude chat for follow-up questions instead of re-querying Genie
+    const chatRequest: ChatRequest = {
+      message: question,
+      context: {
+        conversationHistory,
+        currentQueryResults: currentResult.results
+      }
+    }
+
+    chatWithClaude(chatRequest, {
+      onSuccess: (chatResponse) => {
+        // Add to conversation history
+        setConversationHistory(prev => [
+          ...prev,
+          { role: 'user', content: question },
+          { role: 'assistant', content: chatResponse.message }
+        ])
+        
+        // Update the result with Claude's response as the AI summary
+        setCurrentResult(prev => prev ? {
+          ...prev,
+          aiSummary: chatResponse.message,
+          suggestedFollowups: chatResponse.suggestedFollowups
+        } : null)
+      },
+    })
+  }, [currentResult, conversationHistory, chatWithClaude])
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      {/* Left Sidebar - Suggested Questions */}
+      <aside className="lg:col-span-4 slide-in">
+        <SuggestedQuestions onQuestionSelect={handleQueryComplete} />
+      </aside>
+
+      {/* Main Content Area */}
+      <div className="lg:col-span-8 space-y-6">
+        {/* Query Input */}
+        <section className="fade-in">
+          <div className="bg-gradient-to-r from-card to-muted/30 p-6 rounded-xl border-2 border-border shadow-lg">
+            <h2 className="text-lg font-semibold text-card-foreground mb-4 flex items-center gap-2">
+              <svg className="w-5 h-5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+              </svg>
+              Ask Your Question
+            </h2>
+            <QueryInput onQueryComplete={handleQueryComplete} />
+          </div>
+        </section>
+
+        {/* Results Panel */}
+        {currentResult && (
+          <section className="fade-in">
+            <ResultsPanel
+              result={currentResult}
+              onFollowupClick={handleFollowupClick}
+              isProcessing={isChatPending}
+            />
+          </section>
+        )}
+      </div>
+    </div>
+  )
+}

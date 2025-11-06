@@ -1,0 +1,211 @@
+================================================================================
+GENIE SPACE SQL GENERATION FAILURE - INVESTIGATION SUMMARY
+================================================================================
+
+INVESTIGATION DATE: 2025-11-05
+REQUESTED: Why is Genie Space failing to generate SQL queries?
+ERROR: "failed to reach COMPLETED, got MessageStatus.FAILED"
+
+================================================================================
+KEY FINDING: GENIE SPACE IS FULLY FUNCTIONAL
+================================================================================
+
+The Genie Space itself is properly configured and working correctly.
+The error occurs during message processing, not due to space misconfiguration.
+
+Test Results: 12/12 questions successfully generated SQL (100% pass rate)
+
+================================================================================
+DIAGNOSTIC RESULTS
+================================================================================
+
+CONFIGURATION TESTS - ALL PASS
+[OK] Genie Space exists: 01f0a834208e13dab88b1fd3f7d718c0
+[OK] Space Title: Nielsen Sales Analytics - POS Data
+[OK] Space Description: AI-powered NL interface for Nielsen POS data
+[OK] Warehouse accessible: 939811bf15d2854c (RUNNING, HEALTHY)
+[OK] Data sources connected: p_coe_gold.ofs_nielsen schema
+[OK] Service Principal authenticated: app-1b5gbx mathias-pse-test
+[OK] Genie API available: All methods accessible
+
+QUESTION TESTING - ALL PASS (12/12)
+[PASS] Simple: Show sales → COMPLETED, 1 row
+[PASS] Simple: List brands → COMPLETED, 1343 rows
+[PASS] Data: Top 10 products by sales → COMPLETED, 10 rows
+[PASS] Data: Total sales by brand → COMPLETED, 20 rows
+[PASS] Data: Sales trend by year → COMPLETED, 4 rows
+[PASS] Complex: YoY analysis → COMPLETED, 18 rows
+[PASS] Complex: Outlier detection → COMPLETED, 318 rows
+[PASS] Vague: Tell me about data → COMPLETED
+[PASS] Vague: Give me summary → COMPLETED
+[PASS] Very long question → COMPLETED
+[PASS] Combined complex query → COMPLETED
+[PASS] Multiple filter question → COMPLETED
+
+API RESPONSE VALIDATION - CORRECT
+[OK] Response structure: GenieMessage
+[OK] SQL location: attachment.query.query (CORRECT)
+[OK] Status tracking: MessageStatus enum
+[OK] Error handling: response.error field
+[OK] Attachments: Properly formatted GenieQueryAttachment
+
+================================================================================
+ROOT CAUSE OF ERROR
+================================================================================
+
+The error "MessageStatus.FAILED" indicates that during the SDK's wait polling,
+the message status transitioned to FAILED. This happens when:
+
+1. Request submitted successfully
+2. Space begins processing (FETCHING_METADATA → ASKING_AI)
+3. Something fails during processing
+4. Status goes to FAILED
+5. SDK raises exception
+
+This is NOT caused by:
+- Space misconfiguration (Space works fine)
+- Missing data sources (All working)
+- Warehouse inaccessibility (Warehouse is healthy)
+- Response structure issues (Structure is correct)
+
+Likely causes of FAILED during processing:
+1. SERVICE PRINCIPAL AUTHENTICATION - Most likely
+   - Auth becomes invalid between requests
+   - Permission check fails mid-process
+   - Token expires during long processing
+
+2. CONCURRENT REQUEST HANDLING - Possible
+   - Multiple simultaneous requests overwhelm space
+   - Rate limiting triggered
+   - Request conflicts
+
+3. SPECIFIC QUESTION CHARACTERISTICS - Possible
+   - Very complex questions fail to interpret
+   - Empty/vague questions can't generate SQL
+   - Schema references fail to resolve
+
+4. TIMEOUT - Possible
+   - Long LLM processing takes too long
+   - SDK timeout reached
+
+5. WAREHOUSE PERMISSIONS - Possible
+   - Can generate SQL but can't execute it
+   - Permission denied during query validation
+
+================================================================================
+IMPROVEMENTS DEPLOYED
+================================================================================
+
+Enhanced genie_service.py with:
+
+1. STRUCTURED LOGGING
+   - [GENIE_START] Request begins
+   - [GENIE_API] API call made
+   - [GENIE_RESPONSE] Response received
+   - [GENIE_SQL_FOUND] SQL extracted
+   - [GENIE_SUCCESS] Generation complete
+   - [GENIE_EXCEPTION] Errors captured
+
+2. BETTER ERROR HANDLING
+   - Safe attribute access with getattr()
+   - Detailed error logging with context
+   - Full exception traceback
+   - Query tracking with unique IDs
+
+3. IMPROVED DEBUGGING
+   - Structured log tags for easy filtering
+   - Response metadata logging
+   - SQL length and row count tracking
+   - Timestamp and duration tracking
+
+Example improved log output:
+  [GENIE_START] query_id=abc-123, question=Show top products
+  [GENIE_API] Calling start_conversation_and_wait
+  [GENIE_RESPONSE] Status: MessageStatus.COMPLETED
+  [GENIE_ATTACHMENTS] Found 1 attachment(s)
+  [GENIE_SQL_FOUND] Extracted SQL: 247 chars
+  [QUESTION_COMPLETE] query_id=abc-123, time_ms=4521
+
+================================================================================
+HOW TO INVESTIGATE WHEN ERROR OCCURS
+================================================================================
+
+Step 1: Deploy updated code with enhanced logging
+
+Step 2: When error occurs, look for:
+  [GENIE_START] question=...
+  [GENIE_RESPONSE] Status: MessageStatus.FAILED
+  [GENIE_ERROR] error message
+
+Step 3: Analyze error message patterns:
+  - Permission denied → Check SP permissions
+  - Schema not found → Check data sources
+  - Query invalid → Check question content
+  - Timeout → Increase wait timeout
+
+Step 4: Check Genie Space configuration in UI:
+  - Verify data sources connected
+  - Check for warnings/errors
+  - Review recent conversations
+
+Step 5: Document patterns:
+  - Which questions fail?
+  - Under what load?
+  - What's the frequency?
+
+================================================================================
+RECOMMENDATIONS
+================================================================================
+
+IMMEDIATE (Deploy now):
+1. Code changes are ready (genie_service.py updated)
+2. Deploy enhanced logging
+3. Monitor logs when error occurs
+
+SHORT TERM (When error is caught):
+1. Add authentication validation before API call
+2. Implement exponential backoff retry (3 attempts)
+3. Add request rate limiting
+4. Increase SDK timeout if needed
+
+LONG TERM:
+1. Cache successful questions
+2. Add question validation before sending
+3. Monitor success/failure metrics
+4. Set up alerts for failure rate spikes
+
+================================================================================
+DOCUMENTATION CREATED
+================================================================================
+
+Test Scripts:
+- claude_scripts/test_genie_space.py - Full diagnostic test
+- claude_scripts/test_genie_response_structure.py - Response structure analysis
+- claude_scripts/test_genie_questions.py - Question type testing
+
+Reports:
+- GENIE_INVESTIGATION_SUMMARY.txt (this file)
+- GENIE_ANALYSIS.md - Detailed analysis
+- GENIE_TROUBLESHOOTING_GUIDE.md - Complete troubleshooting guide
+
+Code Changes:
+- server/services/genie_service.py - Enhanced with structured logging
+
+================================================================================
+CONCLUSION
+================================================================================
+
+The Genie Space is working correctly. The MessageStatus.FAILED error occurs
+during specific conditions that are difficult to reproduce in manual testing.
+
+The enhanced logging will help identify:
+1. Which questions fail
+2. What error messages are returned
+3. When failures occur (frequency, timing)
+4. Whether it's auth, permissions, or processing related
+
+Once you see the actual error message in logs, the root cause will become clear.
+
+================================================================================
+NEXT ACTION: Deploy the updated code and monitor logs for failures
+================================================================================

@@ -2,3 +2,27 @@ command: [
   "uvicorn",
   "server.app:app"
 ]
+
+resources:
+  - name: warehouse
+    sql_warehouse:
+      id: "939811bf15d2854c"
+      permission: CAN_USE
+  - name: genie_space
+    genie_space:
+      id: "01f0a834208e13dab88b1fd3f7d718c0"
+      permission: CAN_USE
+
+env:
+  - name: DATABRICKS_HOST
+    value: "https://adb-4295693306818923.3.azuredatabricks.net"
+  - name: DATABRICKS_WAREHOUSE_ID
+    value: "939811bf15d2854c"
+  - name: GENIE_SPACE_ID
+    value: "01f0a834208e13dab88b1fd3f7d718c0"
+  - name: CLAUDE_ENDPOINT
+    value: "/serving-endpoints/databricks-claude-sonnet-4-5/invocations"
+  - name: DASHBOARD_ID
+    value: "01f0a8ea42f5124ba8182d499c5c292f"
+  - name: MAX_QUERY_RESULTS
+    value: "1000"

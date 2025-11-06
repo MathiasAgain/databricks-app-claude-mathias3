@@ -160,11 +160,11 @@ class LogzClient:
           time.sleep(interval)
     
     except KeyboardInterrupt:
-      print(f'\n⏹️  Stopped by user')
-    
+      print(f'\n[STOPPED] Stopped by user')
+
     if duration > 0:
-      print(f'\n⏰ Completed after {duration} seconds')
-    print(f'📊 Displayed {total_displayed} log messages')
+      print(f'\n[COMPLETED] Completed after {duration} seconds')
+    print(f'[STATS] Displayed {total_displayed} log messages')
 
 
 def main():
