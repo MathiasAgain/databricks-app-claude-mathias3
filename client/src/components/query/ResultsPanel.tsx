@@ -156,7 +156,7 @@ export function ResultsPanel({ result, onFollowupClick, isProcessing }: ResultsP
         </CardHeader>
         {showChart && (
           <CardContent className="pt-6">
-            <DataChart data={result.results} />
+            <DataChart results={result.results} />
           </CardContent>
         )}
       </Card>

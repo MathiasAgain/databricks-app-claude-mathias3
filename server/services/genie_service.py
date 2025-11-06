@@ -92,10 +92,7 @@ class GenieService:
             attachments = getattr(response, 'attachments', None)
 
             if attachments:
-                logger.info(f"[GENIE_ATTACHMENTS] Found {len(attachments)} attachment(s)")
-                for i, attachment in enumerate(attachments):
-                    logger.debug(f"[GENIE_ATTACHMENT_{i}] Type: {type(attachment).__name__}")
-
+                for attachment in attachments:
                     # Check if attachment has query
                     query_obj = getattr(attachment, 'query', None)
                     if query_obj:
@@ -103,15 +100,7 @@ class GenieService:
                         sql_text = getattr(query_obj, 'query', None)
                         if sql_text:
                             sql = sql_text
-                            logger.info(f"[GENIE_SQL_FOUND] Extracted SQL from attachment {i}: {len(sql)} chars")
-
-                            # Also log the description for debugging
-                            description = getattr(query_obj, 'description', None)
-                            if description:
-                                logger.debug(f"[GENIE_DESCRIPTION] {description}")
                             break
-                    else:
-                        logger.debug(f"[GENIE_ATTACHMENT_{i}] No query object found")
             else:
                 logger.warning("[GENIE_NO_ATTACHMENTS] Response has no attachments")
 
@@ -291,7 +280,7 @@ class GenieService:
             List of suggested question strings
         """
         return [
-            "Show top 10 products by sales this quarter",
-            "What regions have declining sales trends?",
-            "Compare year-over-year performance for top categories"
+            "Show top 5 categories by value sales for 2024",
+            "Show top 5 products by value sales for 2024",
+            "Show top 5 banners by value sales for 2024"
         ]
