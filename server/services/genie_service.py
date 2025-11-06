@@ -8,6 +8,7 @@ into SQL queries and execute them on the data warehouse.
 import logging
 import uuid
 import time
+import asyncio
 from typing import Optional
 from cachetools import TTLCache
 from databricks.sdk import WorkspaceClient
@@ -33,13 +34,16 @@ class GenieService:
 
         # Initialize query cache if caching is enabled
         self.query_cache: Optional[TTLCache] = None
+        self._cache_lock: Optional[asyncio.Lock] = None
+
         if settings.enable_query_caching:
             self.query_cache = TTLCache(
                 maxsize=100,
                 ttl=settings.query_cache_ttl
             )
+            self._cache_lock = asyncio.Lock()
             logger.info(
-                f"Query caching enabled: maxsize=100, ttl={settings.query_cache_ttl}s"
+                f"Query caching enabled (thread-safe): maxsize=100, ttl={settings.query_cache_ttl}s"
             )
 
     def _get_cache_key(self, question: str) -> str:
@@ -204,7 +208,7 @@ class GenieService:
         Ask a natural language question and get SQL + results.
 
         This is the main end-to-end method that:
-        1. Checks cache (if enabled)
+        1. Checks cache (if enabled) - thread-safe
         2. Generates SQL from question
         3. Executes SQL on warehouse
         4. Returns results with metadata
@@ -225,15 +229,17 @@ class GenieService:
 
         logger.info(f"[QUESTION_START] query_id={query_id}, question={question[:80]}")
 
-        # Check cache
-        if not skip_cache and self.query_cache and cache_key in self.query_cache:
-            logger.info(f"[CACHE_HIT] query_id={query_id}")
-            cached_response = self.query_cache[cache_key]
-            return GenieResponse(
-                **cached_response.dict(),
-                cached=True,
-                queryId=query_id
-            )
+        # Check cache with thread-safety
+        if not skip_cache and self.query_cache and self._cache_lock:
+            async with self._cache_lock:
+                if cache_key in self.query_cache:
+                    logger.info(f"[CACHE_HIT] query_id={query_id}")
+                    cached_response = self.query_cache[cache_key]
+                    return GenieResponse(
+                        **cached_response.dict(),
+                        cached=True,
+                        queryId=query_id
+                    )
 
         # Generate SQL and get Genie's natural language answer
         logger.info(f"[GENERATING_SQL] query_id={query_id}")
@@ -268,10 +274,11 @@ class GenieService:
             cached=False
         )
 
-        # Cache the response
-        if self.query_cache:
-            self.query_cache[cache_key] = response
-            logger.info(f"[RESPONSE_CACHED] query_id={query_id}")
+        # Cache the response with thread-safety
+        if self.query_cache and self._cache_lock:
+            async with self._cache_lock:
+                self.query_cache[cache_key] = response
+                logger.info(f"[RESPONSE_CACHED] query_id={query_id}")
 
         logger.info(f"[QUESTION_COMPLETE] query_id={query_id}, time_ms={execution_time_ms}")
         return response

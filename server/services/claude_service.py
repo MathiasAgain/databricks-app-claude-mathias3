@@ -11,11 +11,16 @@ Integrates with Databricks Claude Sonnet 4.5 endpoint to provide:
 
 import logging
 import json
+import asyncio
 from typing import List, Dict, Any, Optional
 from databricks.sdk import WorkspaceClient
 from server.config import settings
 
 logger = logging.getLogger(__name__)
+
+# Timeout constants for Claude API calls
+CLAUDE_ANALYSIS_TIMEOUT = 30  # 30 seconds for analysis
+CLAUDE_CHAT_TIMEOUT = 20      # 20 seconds for chat
 
 
 class ClaudeService:
@@ -114,7 +119,7 @@ class ClaudeService:
         results: Dict[str, Any],
     ) -> Dict[str, Any]:
         """
-        Analyze query results using Claude AI.
+        Analyze query results using Claude AI with timeout protection.
 
         Args:
             question: Original natural language question
@@ -134,10 +139,17 @@ class ClaudeService:
             prompt = self._build_analysis_prompt(question, sql, results)
             logger.info(f"Prompt built, length: {len(prompt)} chars")
 
-            # Call Claude endpoint with tool support
-            logger.info("Calling _call_claude_with_tools...")
-            response = await self._call_claude_with_tools(prompt)
-            logger.info(f"Response received, length: {len(response)} chars")
+            # Call Claude endpoint with tool support and timeout protection
+            logger.info(f"Calling Claude with {CLAUDE_ANALYSIS_TIMEOUT}s timeout...")
+            try:
+                response = await asyncio.wait_for(
+                    self._call_claude_with_tools(prompt),
+                    timeout=CLAUDE_ANALYSIS_TIMEOUT
+                )
+                logger.info(f"Response received, length: {len(response)} chars")
+            except asyncio.TimeoutError:
+                logger.error(f"Claude analysis timed out after {CLAUDE_ANALYSIS_TIMEOUT}s")
+                raise Exception(f"Claude analysis timed out after {CLAUDE_ANALYSIS_TIMEOUT} seconds")
 
             # Parse and return the analysis
             logger.info("Parsing response...")
@@ -145,6 +157,18 @@ class ClaudeService:
             logger.info("Parsing complete")
             return result
 
+        except asyncio.TimeoutError:
+            logger.error("Claude analysis timed out")
+            # Return fallback on timeout
+            return {
+                "summary": "Query executed successfully. Results are displayed in the table below.",
+                "followup_questions": [
+                    "Show the breakdown by region",
+                    "Compare with previous period",
+                    "Show trends over time"
+                ],
+                "insights": []
+            }
         except Exception as e:
             error_msg = str(e)
             if "401 Unauthorized" in error_msg or "401" in error_msg:
@@ -346,7 +370,7 @@ Provide a JSON response with the following structure:
         query_results: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
-        Chat with Claude in the context of query results.
+        Chat with Claude in the context of query results with timeout protection.
 
         Args:
             message: User's message/question
@@ -410,14 +434,27 @@ Provide a JSON response with the following structure:
                 )
             )
 
-            # Call Claude
-            logger.info("Calling Claude for chat response...")
-            response = self.client.serving_endpoints.query(
-                name=self.endpoint_name,
-                messages=messages,
-                max_tokens=1500,
-                temperature=0.7
-            )
+            # Call Claude with timeout protection
+            logger.info(f"Calling Claude for chat response with {CLAUDE_CHAT_TIMEOUT}s timeout...")
+
+            async def call_claude():
+                """Wrapper to make SDK call awaitable."""
+                return await asyncio.to_thread(
+                    self.client.serving_endpoints.query,
+                    name=self.endpoint_name,
+                    messages=messages,
+                    max_tokens=1500,
+                    temperature=0.7
+                )
+
+            try:
+                response = await asyncio.wait_for(call_claude(), timeout=CLAUDE_CHAT_TIMEOUT)
+            except asyncio.TimeoutError:
+                logger.error(f"Claude chat timed out after {CLAUDE_CHAT_TIMEOUT}s")
+                return {
+                    "message": "Response is taking longer than expected. Please try rephrasing your question.",
+                    "suggested_followups": []
+                }
 
             if response.choices and len(response.choices) > 0:
                 response_text = response.choices[0].message.content
@@ -437,6 +474,12 @@ Provide a JSON response with the following structure:
                 "suggested_followups": []
             }
 
+        except asyncio.TimeoutError:
+            logger.error("Claude chat timed out")
+            return {
+                "message": "Response is taking longer than expected. Please try rephrasing your question.",
+                "suggested_followups": []
+            }
         except Exception as e:
             logger.error(f"Chat failed: {str(e)}")
             logger.exception("Full chat exception:")
