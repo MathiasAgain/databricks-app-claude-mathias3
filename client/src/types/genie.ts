@@ -20,6 +20,34 @@ export interface AskQuestionRequest {
   }
 }
 
+/**
+ * Visualization specification from AI
+ */
+export interface VisualizationAxis {
+  column: string
+  label?: string
+  type?: 'category' | 'linear' | 'time' | 'log'
+}
+
+export interface VisualizationAnnotation {
+  text: string
+  x?: number
+  y?: number
+}
+
+export interface VisualizationSpec {
+  chartType: string
+  title?: string
+  xAxis?: VisualizationAxis
+  yAxis?: VisualizationAxis
+  zAxis?: VisualizationAxis
+  groupBy?: string
+  aggregation?: 'sum' | 'avg' | 'count' | 'min' | 'max'
+  colors?: string[]
+  annotations?: VisualizationAnnotation[]
+  reasoning?: string
+}
+
 export interface AskQuestionResponse {
   question: string
   sql: string
@@ -29,6 +57,7 @@ export interface AskQuestionResponse {
   suggestedFollowups: string[]
   executionTimeMs: number
   queryId: string
+  visualizationSpec?: VisualizationSpec
 }
 
 export interface SuggestedQuestion {

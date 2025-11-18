@@ -207,7 +207,18 @@ class ClaudeService:
         # Sample first few rows for analysis
         sample_rows = rows[:5] if rows else []
 
-        prompt = f"""You are an expert data analyst helping a business user understand their Nielsen sales data query results.
+        prompt = f"""You are an expert data analyst helping a business user understand their Nielsen sales data within the Perfect Sales Execution (PSE) framework.
+
+**Perfect Sales Execution Framework Context:**
+This application analyzes Nielsen sales data through the lens of PSE, which consists of five key pillars:
+
+1. **Availability** - Out-of-stock prevention, SKU availability, inventory management, stock levels
+2. **Visibility** - Shelf placement, facings, share of shelf, merchandising presence, product visibility
+3. **Price & Promotion** - Pricing compliance, promotional execution, price competitiveness, promotional effectiveness
+4. **Merchandising** - Planogram compliance, display execution, POS materials, in-store presentation
+5. **Relationship** - Account management, joint business planning, partnership quality, retailer relationships
+
+When analyzing sales data, consider which PSE pillar(s) the data relates to and provide insights that help improve execution in those areas. Focus on actionable insights that drive better retail execution.
 
 **User's Question:**
 {question}
@@ -236,21 +247,57 @@ class ClaudeService:
 **Your Task:**
 Provide a JSON response with the following structure:
 {
-  "summary": "A clear, business-focused 2-3 sentence summary of what the data shows. Focus on key insights and trends.",
+  "summary": "A clear, business-focused 2-3 sentence summary of what the data shows. Focus on key insights and trends, connecting to relevant PSE pillars when applicable.",
   "followup_questions": [
     "3-5 relevant follow-up questions the user might want to ask based on these results",
-    "Make them specific to the data shown, not generic"
+    "Make them specific to the data shown and aligned with PSE framework pillars",
+    "Focus on questions that help improve retail execution (e.g., availability gaps, visibility opportunities, pricing effectiveness)"
   ],
   "insights": [
     "1-3 proactive insights or observations about the data",
-    "Focus on trends, anomalies, or noteworthy patterns"
-  ]
+    "Focus on trends, anomalies, or noteworthy patterns",
+    "Connect insights to PSE pillars (Availability, Visibility, Price & Promotion, Merchandising, Relationship)",
+    "Provide actionable recommendations for improving retail execution where relevant"
+  ],
+  "visualizationSpec": {
+    "chartType": "Choose the MOST appropriate chart type based on the data structure and analytical intent: bar (comparisons, categories), line (trends over time), scatter (correlations, relationships), pie (proportions, parts of whole), heatmap (patterns across 2 dimensions), histogram (distributions), box (statistical distribution), area (cumulative trends), bubble (3 dimensions)",
+    "title": "Descriptive title for the chart that captures the analytical insight",
+    "xAxis": {
+      "column": "Column name for X axis (use first column if categorical, time column if time-series)",
+      "label": "Human-readable label for X axis",
+      "type": "category|linear|time|log - choose based on data type"
+    },
+    "yAxis": {
+      "column": "Column name for Y axis (typically the measure being analyzed)",
+      "label": "Human-readable label for Y axis",
+      "type": "linear|log - choose based on data distribution"
+    },
+    "groupBy": "Optional: Column name to group/color data by (for multi-series charts)",
+    "aggregation": "Optional: If data needs aggregation - sum|avg|count|min|max",
+    "reasoning": "1-2 sentences explaining WHY this chart type best represents the data and supports the analytical context. Connect to the user's question and insights."
+  }
 }
+
+**Visualization Selection Guidelines:**
+- **Bar charts**: Best for comparing categories, products, regions. Use when comparing discrete items.
+- **Line charts**: Best for time-series, trends over periods. Use when X-axis is temporal.
+- **Scatter plots**: Best for showing correlations, relationships between 2 numeric variables.
+- **Pie charts**: Best for showing parts of a whole (percentages, proportions). Use sparingly, only when <7 categories.
+- **Heatmap**: Best for patterns across 2 categorical dimensions (e.g., product vs region performance).
+- **Histogram**: Best for showing distribution of a single numeric variable.
+- **Box plots**: Best for showing statistical distribution, quartiles, outliers.
+- **Area charts**: Best for showing cumulative trends, stacked values over time.
+- **Bubble charts**: Best for 3D data (X, Y, size), showing relationships with magnitude.
 
 **Important:**
 - Be concise and business-focused
 - Use specific numbers from the data
-- Make follow-up questions contextual and relevant
+- Connect findings to PSE framework pillars when relevant (e.g., 'This availability issue...', 'From a visibility perspective...')
+- Make follow-up questions contextual, relevant, and aligned with improving PSE execution
+- Provide actionable insights that help drive better retail execution
+- **ALWAYS include visualizationSpec** - choose the chart type that best matches the data structure and analytical intent
+- The visualization should enhance understanding of your summary and insights
+- Consider what the user is trying to learn from the data when selecting chart type
 - If no data was returned, explain why that might be
 - Return ONLY valid JSON, no other text
 """
@@ -391,7 +438,18 @@ Provide a JSON response with the following structure:
             messages = []
 
             # Add system message with context
-            system_context = "You are an expert data analyst helping a business user understand their Nielsen sales data."
+            system_context = """You are an expert data analyst helping a business user understand their Nielsen sales data within the Perfect Sales Execution (PSE) framework.
+
+**Perfect Sales Execution Framework:**
+This application operates within the PSE framework, which consists of five key pillars:
+
+1. **Availability** - Out-of-stock prevention, SKU availability, inventory management, stock levels
+2. **Visibility** - Shelf placement, facings, share of shelf, merchandising presence, product visibility
+3. **Price & Promotion** - Pricing compliance, promotional execution, price competitiveness, promotional effectiveness
+4. **Merchandising** - Planogram compliance, display execution, POS materials, in-store presentation
+5. **Relationship** - Account management, joint business planning, partnership quality, retailer relationships
+
+When discussing sales data and providing insights, consider which PSE pillar(s) are most relevant and provide actionable recommendations that help improve retail execution. Focus on practical, business-oriented advice that drives better in-store performance."""
 
             if query_results:
                 columns = query_results.get("columns", [])
@@ -498,7 +556,7 @@ Provide a JSON response with the following structure:
             response: Raw response text from Claude
 
         Returns:
-            Parsed analysis dictionary
+            Parsed analysis dictionary including visualizationSpec
         """
         try:
             # Try to extract JSON from response
@@ -514,12 +572,19 @@ Provide a JSON response with the following structure:
 
             analysis = json.loads(response)
 
-            # Validate structure
-            return {
+            # Validate structure and extract fields
+            result = {
                 "summary": analysis.get("summary", "Query executed successfully."),
                 "followup_questions": analysis.get("followup_questions", [])[:5],  # Max 5
                 "insights": analysis.get("insights", [])[:3]  # Max 3
             }
+
+            # Extract visualization spec if present
+            if "visualizationSpec" in analysis:
+                result["visualization_spec"] = analysis["visualizationSpec"]
+                logger.info(f"Extracted visualization spec: {analysis['visualizationSpec'].get('chartType', 'unknown')}")
+
+            return result
 
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse Claude response as JSON: {str(e)}")

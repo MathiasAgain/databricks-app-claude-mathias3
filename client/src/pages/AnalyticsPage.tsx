@@ -10,6 +10,7 @@ import { QueryInput } from '@/components/query/QueryInput'
 import { SuggestedQuestions } from '@/components/query/SuggestedQuestions'
 import { ResultsPanel } from '@/components/query/ResultsPanel'
 import { useAskQuestion, useChatWithClaude } from '@/hooks/useGenie'
+import { useQueryStore } from '@/stores/queryStore'
 import type { AskQuestionResponse } from '@/types/genie'
 import type { ChatRequest } from '@/types/claude'
 
@@ -19,11 +20,19 @@ export default function AnalyticsPage() {
   const { mutate: askQuestion } = useAskQuestion()
   const { mutate: chatWithClaude, isPending: isChatPending } = useChatWithClaude()
 
+  // Get store actions
+  const setCurrentQuery = useQueryStore((state) => state.setCurrentQuery)
+  const addToHistory = useQueryStore((state) => state.addToHistory)
+
   const handleQueryComplete = useCallback((result: AskQuestionResponse) => {
     setCurrentResult(result)
     // Reset conversation when new query is run
     setConversationHistory([])
-  }, [])
+
+    // Save to query store for visualization page
+    setCurrentQuery(result)
+    addToHistory(result)
+  }, [setCurrentQuery, addToHistory])
 
   const handleFollowupClick = useCallback((question: string) => {
     if (!currentResult) return

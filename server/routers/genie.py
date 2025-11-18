@@ -82,6 +82,9 @@ async def ask_question(
         )
 
         # Build response with AI-generated insights
+        # Extract visualization spec from analysis if present
+        visualization_spec = analysis.get("visualization_spec")
+
         response = AskQuestionResponse(
             question=request.question,
             sql=genie_response.sql,
@@ -90,7 +93,8 @@ async def ask_question(
             aiSummary=analysis["summary"],
             suggestedFollowups=analysis["followup_questions"],
             executionTimeMs=genie_response.executionTimeMs,
-            queryId=genie_response.queryId
+            queryId=genie_response.queryId,
+            visualizationSpec=visualization_spec
         )
 
         logger.info(

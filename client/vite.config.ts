@@ -24,5 +24,15 @@ export default defineConfig({
   },
   build: {
     outDir: 'build',
-  }
+    commonjsOptions: {
+      include: [/plotly\.js/, /node_modules/],
+      transformMixedEsModules: true,
+    },
+  },
+  optimizeDeps: {
+    include: ['plotly.js-dist-min', 'react-plotly.js'],
+    esbuildOptions: {
+      mainFields: ['module', 'main'],
+    },
+  },
 })
