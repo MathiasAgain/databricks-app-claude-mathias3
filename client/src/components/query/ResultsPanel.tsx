@@ -165,7 +165,11 @@ export function ResultsPanel({ result, onFollowupClick, isProcessing }: ResultsP
       <ResultsTable results={result.results} sql={result.sql} />
 
       {/* Chat Interface */}
-      <ChatInterface queryResults={result.results} />
+      <ChatInterface
+        queryResults={result.results}
+        onSendMessage={onFollowupClick}
+        isProcessing={isProcessing}
+      />
     </div>
   )
 }

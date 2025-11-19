@@ -1,0 +1,832 @@
+measures:
+  - name: l4w_value_sales
+    expr: "SUM(`Value Sales`) filter(where date.`Date` >= DATE_ADD(DATE_TRUNC('week',\
+      \ (SELECT MAX(`Calendar Day`) FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), -21)\
+      \ AND date.`Date` <= DATE_ADD(DATE_TRUNC('week', (SELECT MAX(`Calendar Day`)\
+      \ FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), 6))"
+    comment: Total value sales for last 4 complete weeks
+    display_name: L4W Value Sales
+    format:
+      type: currency
+      currency_code: SEK
+
+  - name: l4w_py_value_sales
+    expr: "SUM(`Value Sales`) filter(where date.`Date` >= DATE_ADD(DATE_TRUNC('week',\
+      \ (SELECT MAX(`Calendar Day`) FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), -385)\
+      \ AND date.`Date` <= DATE_ADD(DATE_TRUNC('week', (SELECT MAX(`Calendar Day`)\
+      \ FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), -358))"
+    comment: Total value sales for same 4 weeks prior year
+    display_name: L4W PY Value Sales
+    format:
+      type: currency
+      currency_code: SEK
+
+  - name: l4w_diff_value_sales
+    expr: "MEASURE(l4w_value_sales) - MEASURE(l4w_py_value_sales)"
+    comment: Difference between L4W and L4W PY value sales
+    display_name: L4W vs PY Diff
+    format:
+      type: currency
+      currency_code: SEK
+
+  - name: l4w_pct_value_sales
+    expr: "((MEASURE(l4w_value_sales) - MEASURE(l4w_py_value_sales)) / NULLIF(MEASURE(l4w_py_value_sales),\
+      \ 0)) * 100"
+    comment: Percentage change between L4W and L4W PY value sales
+    display_name: L4W vs PY %
+    format:
+      type: percentage
+
+  - name: l12w_value_sales
+    expr: "SUM(`Value Sales`) filter(where date.`Date` >= DATE_ADD(DATE_TRUNC('week',\
+      \ (SELECT MAX(`Calendar Day`) FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), -77)\
+      \ AND date.`Date` <= DATE_ADD(DATE_TRUNC('week', (SELECT MAX(`Calendar Day`)\
+      \ FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), 6))"
+    comment: Total value sales for last 12 complete weeks
+    display_name: L12W Value Sales
+    format:
+      type: currency
+      currency_code: SEK
+
+  - name: l12w_py_value_sales
+    expr: "SUM(`Value Sales`) filter(where date.`Date` >= DATE_ADD(DATE_TRUNC('week',\
+      \ (SELECT MAX(`Calendar Day`) FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), -441)\
+      \ AND date.`Date` <= DATE_ADD(DATE_TRUNC('week', (SELECT MAX(`Calendar Day`)\
+      \ FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), -358))"
+    comment: Total value sales for same 12 weeks prior year
+    display_name: L12W PY Value Sales
+    format:
+      type: currency
+      currency_code: SEK
+
+  - name: l12w_diff_value_sales
+    expr: "MEASURE(l12w_value_sales) - MEASURE(l12w_py_value_sales)"
+    comment: Difference between L12W and L12W PY value sales
+    display_name: L12W vs PY Diff
+    format:
+      type: currency
+      currency_code: SEK
+
+  - name: l12w_pct_value_sales
+    expr: "((MEASURE(l12w_value_sales) - MEASURE(l12w_py_value_sales)) / NULLIF(MEASURE(l12w_py_value_sales),\
+      \ 0)) * 100"
+    comment: Percentage change between L12W and L12W PY value sales
+    display_name: L12W vs PY %
+    format:
+      type: percentage
+
+  - name: l52w_value_sales
+    expr: "SUM(`Value Sales`) filter(where date.`Date` >= DATE_ADD(DATE_TRUNC('week',\
+      \ (SELECT MAX(`Calendar Day`) FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), -357)\
+      \ AND date.`Date` <= DATE_ADD(DATE_TRUNC('week', (SELECT MAX(`Calendar Day`)\
+      \ FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), 6))"
+    comment: Total value sales for last 52 complete weeks
+    display_name: L52W Value Sales
+    format:
+      type: currency
+      currency_code: SEK
+
+  - name: l52w_py_value_sales
+    expr: "SUM(`Value Sales`) filter(where date.`Date` >= DATE_ADD(DATE_TRUNC('week',\
+      \ (SELECT MAX(`Calendar Day`) FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), -721)\
+      \ AND date.`Date` <= DATE_ADD(DATE_TRUNC('week', (SELECT MAX(`Calendar Day`)\
+      \ FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), -358))"
+    comment: Total value sales for prior 52 weeks
+    display_name: L52W PY Value Sales
+    format:
+      type: currency
+      currency_code: SEK
+
+  - name: l52w_diff_value_sales
+    expr: "MEASURE(l52w_value_sales) - MEASURE(l52w_py_value_sales)"
+    comment: Difference between L52W and L52W PY value sales
+    display_name: L52W vs PY Diff
+    format:
+      type: currency
+      currency_code: SEK
+
+  - name: l52w_pct_value_sales
+    expr: "((MEASURE(l52w_value_sales) - MEASURE(l52w_py_value_sales)) / NULLIF(MEASURE(l52w_py_value_sales),\
+      \ 0)) * 100"
+    comment: Percentage change between L52W and L52W PY value sales
+    display_name: L52W vs PY %
+    format:
+      type: percentage
+
+  - name: ytd_value_sales
+    expr: "SUM(`Value Sales`) filter(where YEAR(date.`Date`) = YEAR((SELECT MAX(`Calendar\
+      \ Day`) FROM p_coe_gold.ofs_nielsen.vw_fact_sales)) AND WEEKOFYEAR(date.`Date`)\
+      \ <= WEEKOFYEAR((SELECT MAX(`Calendar Day`) FROM p_coe_gold.ofs_nielsen.vw_fact_sales)))"
+    comment: Total value sales from week 1 to current week of the year
+    display_name: YTD Value Sales
+    format:
+      type: currency
+      currency_code: SEK
+
+  - name: ytd_py_value_sales
+    expr: "SUM(`Value Sales`) filter(where YEAR(date.`Date`) = YEAR((SELECT MAX(`Calendar\
+      \ Day`) FROM p_coe_gold.ofs_nielsen.vw_fact_sales)) - 1 AND WEEKOFYEAR(date.`Date`)\
+      \ <= WEEKOFYEAR((SELECT MAX(`Calendar Day`) FROM p_coe_gold.ofs_nielsen.vw_fact_sales)))"
+    comment: Total value sales from week 1 to same week number in prior year
+    display_name: YTD PY Value Sales
+    format:
+      type: currency
+      currency_code: SEK
+
+  - name: ytd_diff_value_sales
+    expr: "MEASURE(ytd_value_sales) - MEASURE(ytd_py_value_sales)"
+    comment: Difference between YTD and YTD PY value sales
+    display_name: YTD vs PY Diff
+    format:
+      type: currency
+      currency_code: SEK
+
+  - name: ytd_pct_value_sales
+    expr: "((MEASURE(ytd_value_sales) - MEASURE(ytd_py_value_sales)) / NULLIF(MEASURE(ytd_py_value_sales),\
+      \ 0)) * 100"
+    comment: Percentage change between YTD and YTD PY value sales
+    display_name: YTD vs PY %
+    format:
+      type: percentage
+
+  - name: l4w_volume_cu
+    expr: "SUM(`Volume Sales CU`) filter(where date.`Date` >= DATE_ADD(DATE_TRUNC('week',\
+      \ (SELECT MAX(`Calendar Day`) FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), -21)\
+      \ AND date.`Date` <= DATE_ADD(DATE_TRUNC('week', (SELECT MAX(`Calendar Day`)\
+      \ FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), 6))"
+    comment: Total volume sales CU for last 4 complete weeks
+    display_name: L4W Volume CU
+    format:
+      type: number
+
+  - name: l4w_py_volume_cu
+    expr: "SUM(`Volume Sales CU`) filter(where date.`Date` >= DATE_ADD(DATE_TRUNC('week',\
+      \ (SELECT MAX(`Calendar Day`) FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), -385)\
+      \ AND date.`Date` <= DATE_ADD(DATE_TRUNC('week', (SELECT MAX(`Calendar Day`)\
+      \ FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), -358))"
+    comment: Total volume sales CU for same 4 weeks prior year
+    display_name: L4W PY Volume CU
+    format:
+      type: number
+
+  - name: l4w_diff_volume_cu
+    expr: "MEASURE(l4w_volume_cu) - MEASURE(l4w_py_volume_cu)"
+    comment: Difference between L4W and L4W PY volume CU
+    display_name: L4W vs PY Diff
+    format:
+      type: number
+
+  - name: l4w_pct_volume_cu
+    expr: "((MEASURE(l4w_volume_cu) - MEASURE(l4w_py_volume_cu)) / NULLIF(MEASURE(l4w_py_volume_cu),\
+      \ 0)) * 100"
+    comment: Percentage change between L4W and L4W PY volume CU
+    display_name: L4W vs PY %
+    format:
+      type: percentage
+
+  - name: l12w_volume_cu
+    expr: "SUM(`Volume Sales CU`) filter(where date.`Date` >= DATE_ADD(DATE_TRUNC('week',\
+      \ (SELECT MAX(`Calendar Day`) FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), -77)\
+      \ AND date.`Date` <= DATE_ADD(DATE_TRUNC('week', (SELECT MAX(`Calendar Day`)\
+      \ FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), 6))"
+    comment: Total volume sales CU for last 12 complete weeks
+    display_name: L12W Volume CU
+    format:
+      type: number
+
+  - name: l12w_py_volume_cu
+    expr: "SUM(`Volume Sales CU`) filter(where date.`Date` >= DATE_ADD(DATE_TRUNC('week',\
+      \ (SELECT MAX(`Calendar Day`) FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), -441)\
+      \ AND date.`Date` <= DATE_ADD(DATE_TRUNC('week', (SELECT MAX(`Calendar Day`)\
+      \ FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), -358))"
+    comment: Total volume sales CU for same 12 weeks prior year
+    display_name: L12W PY Volume CU
+    format:
+      type: number
+
+  - name: l12w_diff_volume_cu
+    expr: "MEASURE(l12w_volume_cu) - MEASURE(l12w_py_volume_cu)"
+    comment: Difference between L12W and L12W PY volume CU
+    display_name: L12W vs PY Diff
+    format:
+      type: number
+
+  - name: l12w_pct_volume_cu
+    expr: "((MEASURE(l12w_volume_cu) - MEASURE(l12w_py_volume_cu)) / NULLIF(MEASURE(l12w_py_volume_cu),\
+      \ 0)) * 100"
+    comment: Percentage change between L12W and L12W PY volume CU
+    display_name: L12W vs PY %
+    format:
+      type: percentage
+
+  - name: l52w_volume_cu
+    expr: "SUM(`Volume Sales CU`) filter(where date.`Date` >= DATE_ADD(DATE_TRUNC('week',\
+      \ (SELECT MAX(`Calendar Day`) FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), -357)\
+      \ AND date.`Date` <= DATE_ADD(DATE_TRUNC('week', (SELECT MAX(`Calendar Day`)\
+      \ FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), 6))"
+    comment: Total volume sales CU for last 52 complete weeks
+    display_name: L52W Volume CU
+    format:
+      type: number
+
+  - name: l52w_py_volume_cu
+    expr: "SUM(`Volume Sales CU`) filter(where date.`Date` >= DATE_ADD(DATE_TRUNC('week',\
+      \ (SELECT MAX(`Calendar Day`) FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), -721)\
+      \ AND date.`Date` <= DATE_ADD(DATE_TRUNC('week', (SELECT MAX(`Calendar Day`)\
+      \ FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), -358))"
+    comment: Total volume sales CU for prior 52 weeks
+    display_name: L52W PY Volume CU
+    format:
+      type: number
+
+  - name: l52w_diff_volume_cu
+    expr: "MEASURE(l52w_volume_cu) - MEASURE(l52w_py_volume_cu)"
+    comment: Difference between L52W and L52W PY volume CU
+    display_name: L52W vs PY Diff
+    format:
+      type: number
+
+  - name: l52w_pct_volume_cu
+    expr: "((MEASURE(l52w_volume_cu) - MEASURE(l52w_py_volume_cu)) / NULLIF(MEASURE(l52w_py_volume_cu),\
+      \ 0)) * 100"
+    comment: Percentage change between L52W and L52W PY volume CU
+    display_name: L52W vs PY %
+    format:
+      type: percentage
+
+  - name: ytd_volume_cu
+    expr: "SUM(`Volume Sales CU`) filter(where YEAR(date.`Date`) = YEAR((SELECT MAX(`Calendar\
+      \ Day`) FROM p_coe_gold.ofs_nielsen.vw_fact_sales)) AND WEEKOFYEAR(date.`Date`)\
+      \ <= WEEKOFYEAR((SELECT MAX(`Calendar Day`) FROM p_coe_gold.ofs_nielsen.vw_fact_sales)))"
+    comment: Total volume sales CU from week 1 to current week of the year
+    display_name: YTD Volume CU
+    format:
+      type: number
+
+  - name: ytd_py_volume_cu
+    expr: "SUM(`Volume Sales CU`) filter(where YEAR(date.`Date`) = YEAR((SELECT MAX(`Calendar\
+      \ Day`) FROM p_coe_gold.ofs_nielsen.vw_fact_sales)) - 1 AND WEEKOFYEAR(date.`Date`)\
+      \ <= WEEKOFYEAR((SELECT MAX(`Calendar Day`) FROM p_coe_gold.ofs_nielsen.vw_fact_sales)))"
+    comment: Total volume sales CU from week 1 to same week number in prior year
+    display_name: YTD PY Volume CU
+    format:
+      type: number
+
+  - name: ytd_diff_volume_cu
+    expr: "MEASURE(ytd_volume_cu) - MEASURE(ytd_py_volume_cu)"
+    comment: Difference between YTD and YTD PY volume CU
+    display_name: YTD vs PY Diff
+    format:
+      type: number
+
+  - name: ytd_pct_volume_cu
+    expr: "((MEASURE(ytd_volume_cu) - MEASURE(ytd_py_volume_cu)) / NULLIF(MEASURE(ytd_py_volume_cu),\
+      \ 0)) * 100"
+    comment: Percentage change between YTD and YTD PY volume CU
+    display_name: YTD vs PY %
+    format:
+      type: percentage
+
+  - name: l4w_orkla_value
+    expr: "SUM(`Value Sales`) filter(where product.Manufacturer = 'ORKLA FOODS SVERIGE'\
+      \ AND date.`Date` >= DATE_ADD(DATE_TRUNC('week', (SELECT MAX(`Calendar Day`)\
+      \ FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), -21) AND date.`Date` <= DATE_ADD(DATE_TRUNC('week',\
+      \ (SELECT MAX(`Calendar Day`) FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), 6))"
+    comment: Orkla value sales for last 4 complete weeks
+    display_name: L4W Orkla Value
+    format:
+      type: currency
+      currency_code: SEK
+
+  - name: l4w_py_orkla_value
+    expr: "SUM(`Value Sales`) filter(where product.Manufacturer = 'ORKLA FOODS SVERIGE'\
+      \ AND date.`Date` >= DATE_ADD(DATE_TRUNC('week', (SELECT MAX(`Calendar Day`)\
+      \ FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), -385) AND date.`Date` <= DATE_ADD(DATE_TRUNC('week',\
+      \ (SELECT MAX(`Calendar Day`) FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), -358))"
+    comment: Orkla value sales for same 4 weeks prior year
+    display_name: L4W PY Orkla Value
+    format:
+      type: currency
+      currency_code: SEK
+
+  - name: l4w_diff_orkla_value
+    expr: "MEASURE(l4w_orkla_value) - MEASURE(l4w_py_orkla_value)"
+    comment: Difference between L4W and L4W PY Orkla value sales
+    display_name: L4W vs PY Diff
+    format:
+      type: currency
+      currency_code: SEK
+
+  - name: l4w_pct_orkla_value
+    expr: "((MEASURE(l4w_orkla_value) - MEASURE(l4w_py_orkla_value)) / NULLIF(MEASURE(l4w_py_orkla_value),\
+      \ 0)) * 100"
+    comment: Percentage change between L4W and L4W PY Orkla value sales
+    display_name: L4W vs PY %
+    format:
+      type: percentage
+
+  - name: l12w_orkla_value
+    expr: "SUM(`Value Sales`) filter(where product.Manufacturer = 'ORKLA FOODS SVERIGE'\
+      \ AND date.`Date` >= DATE_ADD(DATE_TRUNC('week', (SELECT MAX(`Calendar Day`)\
+      \ FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), -77) AND date.`Date` <= DATE_ADD(DATE_TRUNC('week',\
+      \ (SELECT MAX(`Calendar Day`) FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), 6))"
+    comment: Orkla value sales for last 12 complete weeks
+    display_name: L12W Orkla Value
+    format:
+      type: currency
+      currency_code: SEK
+
+  - name: l12w_py_orkla_value
+    expr: "SUM(`Value Sales`) filter(where product.Manufacturer = 'ORKLA FOODS SVERIGE'\
+      \ AND date.`Date` >= DATE_ADD(DATE_TRUNC('week', (SELECT MAX(`Calendar Day`)\
+      \ FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), -441) AND date.`Date` <= DATE_ADD(DATE_TRUNC('week',\
+      \ (SELECT MAX(`Calendar Day`) FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), -358))"
+    comment: Orkla value sales for same 12 weeks prior year
+    display_name: L12W PY Orkla Value
+    format:
+      type: currency
+      currency_code: SEK
+
+  - name: l12w_diff_orkla_value
+    expr: "MEASURE(l12w_orkla_value) - MEASURE(l12w_py_orkla_value)"
+    comment: Difference between L12W and L12W PY Orkla value sales
+    display_name: L12W vs PY Diff
+    format:
+      type: currency
+      currency_code: SEK
+
+  - name: l12w_pct_orkla_value
+    expr: "((MEASURE(l12w_orkla_value) - MEASURE(l12w_py_orkla_value)) / NULLIF(MEASURE(l12w_py_orkla_value),\
+      \ 0)) * 100"
+    comment: Percentage change between L12W and L12W PY Orkla value sales
+    display_name: L12W vs PY %
+    format:
+      type: percentage
+
+  - name: l52w_orkla_value
+    expr: "SUM(`Value Sales`) filter(where product.Manufacturer = 'ORKLA FOODS SVERIGE'\
+      \ AND date.`Date` >= DATE_ADD(DATE_TRUNC('week', (SELECT MAX(`Calendar Day`)\
+      \ FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), -357) AND date.`Date` <= DATE_ADD(DATE_TRUNC('week',\
+      \ (SELECT MAX(`Calendar Day`) FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), 6))"
+    comment: Orkla value sales for last 52 complete weeks
+    display_name: L52W Orkla Value
+    format:
+      type: currency
+      currency_code: SEK
+
+  - name: l52w_py_orkla_value
+    expr: "SUM(`Value Sales`) filter(where product.Manufacturer = 'ORKLA FOODS SVERIGE'\
+      \ AND date.`Date` >= DATE_ADD(DATE_TRUNC('week', (SELECT MAX(`Calendar Day`)\
+      \ FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), -721) AND date.`Date` <= DATE_ADD(DATE_TRUNC('week',\
+      \ (SELECT MAX(`Calendar Day`) FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), -358))"
+    comment: Orkla value sales for prior 52 weeks
+    display_name: L52W PY Orkla Value
+    format:
+      type: currency
+      currency_code: SEK
+
+  - name: l52w_diff_orkla_value
+    expr: "MEASURE(l52w_orkla_value) - MEASURE(l52w_py_orkla_value)"
+    comment: Difference between L52W and L52W PY Orkla value sales
+    display_name: L52W vs PY Diff
+    format:
+      type: currency
+      currency_code: SEK
+
+  - name: l52w_pct_orkla_value
+    expr: "((MEASURE(l52w_orkla_value) - MEASURE(l52w_py_orkla_value)) / NULLIF(MEASURE(l52w_py_orkla_value),\
+      \ 0)) * 100"
+    comment: Percentage change between L52W and L52W PY Orkla value sales
+    display_name: L52W vs PY %
+    format:
+      type: percentage
+
+  - name: ytd_orkla_value
+    expr: "SUM(`Value Sales`) filter(where product.Manufacturer = 'ORKLA FOODS SVERIGE'\
+      \ AND YEAR(date.`Date`) = YEAR((SELECT MAX(`Calendar Day`) FROM p_coe_gold.ofs_nielsen.vw_fact_sales))\
+      \ AND WEEKOFYEAR(date.`Date`) <= WEEKOFYEAR((SELECT MAX(`Calendar Day`) FROM\
+      \ p_coe_gold.ofs_nielsen.vw_fact_sales)))"
+    comment: Orkla value sales from week 1 to current week of the year
+    display_name: YTD Orkla Value
+    format:
+      type: currency
+      currency_code: SEK
+
+  - name: ytd_py_orkla_value
+    expr: "SUM(`Value Sales`) filter(where product.Manufacturer = 'ORKLA FOODS SVERIGE'\
+      \ AND YEAR(date.`Date`) = YEAR((SELECT MAX(`Calendar Day`) FROM p_coe_gold.ofs_nielsen.vw_fact_sales))\
+      \ - 1 AND WEEKOFYEAR(date.`Date`) <= WEEKOFYEAR((SELECT MAX(`Calendar Day`)\
+      \ FROM p_coe_gold.ofs_nielsen.vw_fact_sales)))"
+    comment: Orkla value sales from week 1 to same week number in prior year
+    display_name: YTD PY Orkla Value
+    format:
+      type: currency
+      currency_code: SEK
+
+  - name: ytd_diff_orkla_value
+    expr: "MEASURE(ytd_orkla_value) - MEASURE(ytd_py_orkla_value)"
+    comment: Difference between YTD and YTD PY Orkla value sales
+    display_name: YTD vs PY Diff
+    format:
+      type: currency
+      currency_code: SEK
+
+  - name: ytd_pct_orkla_value
+    expr: "((MEASURE(ytd_orkla_value) - MEASURE(ytd_py_orkla_value)) / NULLIF(MEASURE(ytd_py_orkla_value),\
+      \ 0)) * 100"
+    comment: Percentage change between YTD and YTD PY Orkla value sales
+    display_name: YTD vs PY %
+    format:
+      type: percentage
+
+  - name: l4w_orkla_share_value
+    expr: "(MEASURE(l4w_orkla_value) / NULLIF(MEASURE(l4w_value_sales), 0)) * 100"
+    comment: Orkla market share (value %) for last 4 complete weeks
+    display_name: L4W Orkla Share %
+    format:
+      type: percentage
+
+  - name: l4w_py_orkla_share_value
+    expr: "(MEASURE(l4w_py_orkla_value) / NULLIF(MEASURE(l4w_py_value_sales), 0))\
+      \ * 100"
+    comment: Orkla market share (value %) for same 4 weeks prior year
+    display_name: L4W PY Orkla Share %
+    format:
+      type: percentage
+
+  - name: l4w_diff_orkla_share_value
+    expr: "MEASURE(l4w_orkla_share_value) - MEASURE(l4w_py_orkla_share_value)"
+    comment: Percentage point difference between L4W and L4W PY Orkla share
+    display_name: L4W vs PY pp
+    format:
+      type: percentage
+
+  - name: l4w_pct_orkla_share_value
+    expr: "((MEASURE(l4w_orkla_share_value) - MEASURE(l4w_py_orkla_share_value))\
+      \ / NULLIF(MEASURE(l4w_py_orkla_share_value), 0)) * 100"
+    comment: Percentage change between L4W and L4W PY Orkla share
+    display_name: L4W vs PY %
+    format:
+      type: percentage
+
+  - name: l12w_orkla_share_value
+    expr: "(MEASURE(l12w_orkla_value) / NULLIF(MEASURE(l12w_value_sales), 0)) *\
+      \ 100"
+    comment: Orkla market share (value %) for last 12 complete weeks
+    display_name: L12W Orkla Share %
+    format:
+      type: percentage
+
+  - name: l12w_py_orkla_share_value
+    expr: "(MEASURE(l12w_py_orkla_value) / NULLIF(MEASURE(l12w_py_value_sales), 0))\
+      \ * 100"
+    comment: Orkla market share (value %) for same 12 weeks prior year
+    display_name: L12W PY Orkla Share %
+    format:
+      type: percentage
+
+  - name: l12w_diff_orkla_share_value
+    expr: "MEASURE(l12w_orkla_share_value) - MEASURE(l12w_py_orkla_share_value)"
+    comment: Percentage point difference between L12W and L12W PY Orkla share
+    display_name: L12W vs PY pp
+    format:
+      type: percentage
+
+  - name: l12w_pct_orkla_share_value
+    expr: "((MEASURE(l12w_orkla_share_value) - MEASURE(l12w_py_orkla_share_value))\
+      \ / NULLIF(MEASURE(l12w_py_orkla_share_value), 0)) * 100"
+    comment: Percentage change between L12W and L12W PY Orkla share
+    display_name: L12W vs PY %
+    format:
+      type: percentage
+
+  - name: l52w_orkla_share_value
+    expr: "(MEASURE(l52w_orkla_value) / NULLIF(MEASURE(l52w_value_sales), 0)) *\
+      \ 100"
+    comment: Orkla market share (value %) for last 52 complete weeks
+    display_name: L52W Orkla Share %
+    format:
+      type: percentage
+
+  - name: l52w_py_orkla_share_value
+    expr: "(MEASURE(l52w_py_orkla_value) / NULLIF(MEASURE(l52w_py_value_sales), 0))\
+      \ * 100"
+    comment: Orkla market share (value %) for prior 52 weeks
+    display_name: L52W PY Orkla Share %
+    format:
+      type: percentage
+
+  - name: l52w_diff_orkla_share_value
+    expr: "MEASURE(l52w_orkla_share_value) - MEASURE(l52w_py_orkla_share_value)"
+    comment: Percentage point difference between L52W and L52W PY Orkla share
+    display_name: L52W vs PY pp
+    format:
+      type: percentage
+
+  - name: l52w_pct_orkla_share_value
+    expr: "((MEASURE(l52w_orkla_share_value) - MEASURE(l52w_py_orkla_share_value))\
+      \ / NULLIF(MEASURE(l52w_py_orkla_share_value), 0)) * 100"
+    comment: Percentage change between L52W and L52W PY Orkla share
+    display_name: L52W vs PY %
+    format:
+      type: percentage
+
+  - name: ytd_orkla_share_value
+    expr: "(MEASURE(ytd_orkla_value) / NULLIF(MEASURE(ytd_value_sales), 0)) * 100"
+    comment: Orkla market share (value %) from week 1 to current week
+    display_name: YTD Orkla Share %
+    format:
+      type: percentage
+
+  - name: ytd_py_orkla_share_value
+    expr: "(MEASURE(ytd_py_orkla_value) / NULLIF(MEASURE(ytd_py_value_sales), 0))\
+      \ * 100"
+    comment: Orkla market share (value %) from week 1 to same week in prior year
+    display_name: YTD PY Orkla Share %
+    format:
+      type: percentage
+
+  - name: ytd_diff_orkla_share_value
+    expr: "MEASURE(ytd_orkla_share_value) - MEASURE(ytd_py_orkla_share_value)"
+    comment: Percentage point difference between YTD and YTD PY Orkla share
+    display_name: YTD vs PY pp
+    format:
+      type: percentage
+
+  - name: ytd_pct_orkla_share_value
+    expr: "((MEASURE(ytd_orkla_share_value) - MEASURE(ytd_py_orkla_share_value))\
+      \ / NULLIF(MEASURE(ytd_py_orkla_share_value), 0)) * 100"
+    comment: Percentage change between YTD and YTD PY Orkla share
+    display_name: YTD vs PY %
+    format:
+      type: percentage
+
+  - name: l4w_promo_value
+    expr: "SUM(`Promo Value`) filter(where date.`Date` >= DATE_ADD(DATE_TRUNC('week',\
+      \ (SELECT MAX(`Calendar Day`) FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), -21)\
+      \ AND date.`Date` <= DATE_ADD(DATE_TRUNC('week', (SELECT MAX(`Calendar Day`)\
+      \ FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), 6))"
+    comment: Total promo value for last 4 complete weeks
+    display_name: L4W Promo Value
+    format:
+      type: currency
+      currency_code: SEK
+
+  - name: l4w_py_promo_value
+    expr: "SUM(`Promo Value`) filter(where date.`Date` >= DATE_ADD(DATE_TRUNC('week',\
+      \ (SELECT MAX(`Calendar Day`) FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), -385)\
+      \ AND date.`Date` <= DATE_ADD(DATE_TRUNC('week', (SELECT MAX(`Calendar Day`)\
+      \ FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), -358))"
+    comment: Total promo value for same 4 weeks prior year
+    display_name: L4W PY Promo Value
+    format:
+      type: currency
+      currency_code: SEK
+
+  - name: l4w_diff_promo_value
+    expr: "MEASURE(l4w_promo_value) - MEASURE(l4w_py_promo_value)"
+    comment: Difference between L4W and L4W PY promo value
+    display_name: L4W vs PY Diff
+    format:
+      type: currency
+      currency_code: SEK
+
+  - name: l4w_pct_promo_value
+    expr: "((MEASURE(l4w_promo_value) - MEASURE(l4w_py_promo_value)) / NULLIF(MEASURE(l4w_py_promo_value),\
+      \ 0)) * 100"
+    comment: Percentage change between L4W and L4W PY promo value
+    display_name: L4W vs PY %
+    format:
+      type: percentage
+
+  - name: l12w_promo_value
+    expr: "SUM(`Promo Value`) filter(where date.`Date` >= DATE_ADD(DATE_TRUNC('week',\
+      \ (SELECT MAX(`Calendar Day`) FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), -77)\
+      \ AND date.`Date` <= DATE_ADD(DATE_TRUNC('week', (SELECT MAX(`Calendar Day`)\
+      \ FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), 6))"
+    comment: Total promo value for last 12 complete weeks
+    display_name: L12W Promo Value
+    format:
+      type: currency
+      currency_code: SEK
+
+  - name: l12w_py_promo_value
+    expr: "SUM(`Promo Value`) filter(where date.`Date` >= DATE_ADD(DATE_TRUNC('week',\
+      \ (SELECT MAX(`Calendar Day`) FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), -441)\
+      \ AND date.`Date` <= DATE_ADD(DATE_TRUNC('week', (SELECT MAX(`Calendar Day`)\
+      \ FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), -358))"
+    comment: Total promo value for same 12 weeks prior year
+    display_name: L12W PY Promo Value
+    format:
+      type: currency
+      currency_code: SEK
+
+  - name: l12w_diff_promo_value
+    expr: "MEASURE(l12w_promo_value) - MEASURE(l12w_py_promo_value)"
+    comment: Difference between L12W and L12W PY promo value
+    display_name: L12W vs PY Diff
+    format:
+      type: currency
+      currency_code: SEK
+
+  - name: l12w_pct_promo_value
+    expr: "((MEASURE(l12w_promo_value) - MEASURE(l12w_py_promo_value)) / NULLIF(MEASURE(l12w_py_promo_value),\
+      \ 0)) * 100"
+    comment: Percentage change between L12W and L12W PY promo value
+    display_name: L12W vs PY %
+    format:
+      type: percentage
+
+  - name: l52w_promo_value
+    expr: "SUM(`Promo Value`) filter(where date.`Date` >= DATE_ADD(DATE_TRUNC('week',\
+      \ (SELECT MAX(`Calendar Day`) FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), -357)\
+      \ AND date.`Date` <= DATE_ADD(DATE_TRUNC('week', (SELECT MAX(`Calendar Day`)\
+      \ FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), 6))"
+    comment: Total promo value for last 52 complete weeks
+    display_name: L52W Promo Value
+    format:
+      type: currency
+      currency_code: SEK
+
+  - name: l52w_py_promo_value
+    expr: "SUM(`Promo Value`) filter(where date.`Date` >= DATE_ADD(DATE_TRUNC('week',\
+      \ (SELECT MAX(`Calendar Day`) FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), -721)\
+      \ AND date.`Date` <= DATE_ADD(DATE_TRUNC('week', (SELECT MAX(`Calendar Day`)\
+      \ FROM p_coe_gold.ofs_nielsen.vw_fact_sales)), -358))"
+    comment: Total promo value for prior 52 weeks
+    display_name: L52W PY Promo Value
+    format:
+      type: currency
+      currency_code: SEK
+
+  - name: l52w_diff_promo_value
+    expr: "MEASURE(l52w_promo_value) - MEASURE(l52w_py_promo_value)"
+    comment: Difference between L52W and L52W PY promo value
+    display_name: L52W vs PY Diff
+    format:
+      type: currency
+      currency_code: SEK
+
+  - name: l52w_pct_promo_value
+    expr: "((MEASURE(l52w_promo_value) - MEASURE(l52w_py_promo_value)) / NULLIF(MEASURE(l52w_py_promo_value),\
+      \ 0)) * 100"
+    comment: Percentage change between L52W and L52W PY promo value
+    display_name: L52W vs PY %
+    format:
+      type: percentage
+
+  - name: ytd_promo_value
+    expr: "SUM(`Promo Value`) filter(where YEAR(date.`Date`) = YEAR((SELECT MAX(`Calendar\
+      \ Day`) FROM p_coe_gold.ofs_nielsen.vw_fact_sales)) AND WEEKOFYEAR(date.`Date`)\
+      \ <= WEEKOFYEAR((SELECT MAX(`Calendar Day`) FROM p_coe_gold.ofs_nielsen.vw_fact_sales)))"
+    comment: Total promo value from week 1 to current week of the year
+    display_name: YTD Promo Value
+    format:
+      type: currency
+      currency_code: SEK
+
+  - name: ytd_py_promo_value
+    expr: "SUM(`Promo Value`) filter(where YEAR(date.`Date`) = YEAR((SELECT MAX(`Calendar\
+      \ Day`) FROM p_coe_gold.ofs_nielsen.vw_fact_sales)) - 1 AND WEEKOFYEAR(date.`Date`)\
+      \ <= WEEKOFYEAR((SELECT MAX(`Calendar Day`) FROM p_coe_gold.ofs_nielsen.vw_fact_sales)))"
+    comment: Total promo value from week 1 to same week number in prior year
+    display_name: YTD PY Promo Value
+    format:
+      type: currency
+      currency_code: SEK
+
+  - name: ytd_diff_promo_value
+    expr: "MEASURE(ytd_promo_value) - MEASURE(ytd_py_promo_value)"
+    comment: Difference between YTD and YTD PY promo value
+    display_name: YTD vs PY Diff
+    format:
+      type: currency
+      currency_code: SEK
+
+  - name: ytd_pct_promo_value
+    expr: "((MEASURE(ytd_promo_value) - MEASURE(ytd_py_promo_value)) / NULLIF(MEASURE(ytd_py_promo_value),\
+      \ 0)) * 100"
+    comment: Percentage change between YTD and YTD PY promo value
+    display_name: YTD vs PY %
+    format:
+      type: percentage
+
+  - name: l4w_vod_pct_value
+    expr: "(MEASURE(l4w_promo_value) / NULLIF(MEASURE(l4w_value_sales), 0)) * 100"
+    comment: VoD % (value on deal %) for last 4 complete weeks
+    display_name: L4W VoD %
+    format:
+      type: percentage
+
+  - name: l4w_py_vod_pct_value
+    expr: "(MEASURE(l4w_py_promo_value) / NULLIF(MEASURE(l4w_py_value_sales), 0))\
+      \ * 100"
+    comment: VoD % (value on deal %) for same 4 weeks prior year
+    display_name: L4W PY VoD %
+    format:
+      type: percentage
+
+  - name: l4w_diff_vod_pct_value
+    expr: "MEASURE(l4w_vod_pct_value) - MEASURE(l4w_py_vod_pct_value)"
+    comment: Percentage point difference between L4W and L4W PY VoD %
+    display_name: L4W vs PY pp
+    format:
+      type: percentage
+
+  - name: l4w_pct_vod_pct_value
+    expr: "((MEASURE(l4w_vod_pct_value) - MEASURE(l4w_py_vod_pct_value)) / NULLIF(MEASURE(l4w_py_vod_pct_value),\
+      \ 0)) * 100"
+    comment: Percentage change between L4W and L4W PY VoD %
+    display_name: L4W vs PY %
+    format:
+      type: percentage
+
+  - name: l12w_vod_pct_value
+    expr: "(MEASURE(l12w_promo_value) / NULLIF(MEASURE(l12w_value_sales), 0)) * 100"
+    comment: VoD % (value on deal %) for last 12 complete weeks
+    display_name: L12W VoD %
+    format:
+      type: percentage
+
+  - name: l12w_py_vod_pct_value
+    expr: "(MEASURE(l12w_py_promo_value) / NULLIF(MEASURE(l12w_py_value_sales), 0))\
+      \ * 100"
+    comment: VoD % (value on deal %) for same 12 weeks prior year
+    display_name: L12W PY VoD %
+    format:
+      type: percentage
+
+  - name: l12w_diff_vod_pct_value
+    expr: "MEASURE(l12w_vod_pct_value) - MEASURE(l12w_py_vod_pct_value)"
+    comment: Percentage point difference between L12W and L12W PY VoD %
+    display_name: L12W vs PY pp
+    format:
+      type: percentage
+
+  - name: l12w_pct_vod_pct_value
+    expr: "((MEASURE(l12w_vod_pct_value) - MEASURE(l12w_py_vod_pct_value)) / NULLIF(MEASURE(l12w_py_vod_pct_value),\
+      \ 0)) * 100"
+    comment: Percentage change between L12W and L12W PY VoD %
+    display_name: L12W vs PY %
+    format:
+      type: percentage
+
+  - name: l52w_vod_pct_value
+    expr: "(MEASURE(l52w_promo_value) / NULLIF(MEASURE(l52w_value_sales), 0)) * 100"
+    comment: VoD % (value on deal %) for last 52 complete weeks
+    display_name: L52W VoD %
+    format:
+      type: percentage
+
+  - name: l52w_py_vod_pct_value
+    expr: "(MEASURE(l52w_py_promo_value) / NULLIF(MEASURE(l52w_py_value_sales), 0))\
+      \ * 100"
+    comment: VoD % (value on deal %) for prior 52 weeks
+    display_name: L52W PY VoD %
+    format:
+      type: percentage
+
+  - name: l52w_diff_vod_pct_value
+    expr: "MEASURE(l52w_vod_pct_value) - MEASURE(l52w_py_vod_pct_value)"
+    comment: Percentage point difference between L52W and L52W PY VoD %
+    display_name: L52W vs PY pp
+    format:
+      type: percentage
+
+  - name: l52w_pct_vod_pct_value
+    expr: "((MEASURE(l52w_vod_pct_value) - MEASURE(l52w_py_vod_pct_value)) / NULLIF(MEASURE(l52w_py_vod_pct_value),\
+      \ 0)) * 100"
+    comment: Percentage change between L52W and L52W PY VoD %
+    display_name: L52W vs PY %
+    format:
+      type: percentage
+
+  - name: ytd_vod_pct_value
+    expr: "(MEASURE(ytd_promo_value) / NULLIF(MEASURE(ytd_value_sales), 0)) * 100"
+    comment: VoD % (value on deal %) from week 1 to current week
+    display_name: YTD VoD %
+    format:
+      type: percentage
+
+  - name: ytd_py_vod_pct_value
+    expr: "(MEASURE(ytd_py_promo_value) / NULLIF(MEASURE(ytd_py_value_sales), 0))\
+      \ * 100"
+    comment: VoD % (value on deal %) from week 1 to same week in prior year
+    display_name: YTD PY VoD %
+    format:
+      type: percentage
+
+  - name: ytd_diff_vod_pct_value
+    expr: "MEASURE(ytd_vod_pct_value) - MEASURE(ytd_py_vod_pct_value)"
+    comment: Percentage point difference between YTD and YTD PY VoD %
+    display_name: YTD vs PY pp
+    format:
+      type: percentage
+
+  - name: ytd_pct_vod_pct_value
+    expr: "((MEASURE(ytd_vod_pct_value) - MEASURE(ytd_py_vod_pct_value)) / NULLIF(MEASURE(ytd_py_vod_pct_value),\
+      \ 0)) * 100"
+    comment: Percentage change between YTD and YTD PY VoD %
+    display_name: YTD vs PY %
+    format:
+      type: percentage

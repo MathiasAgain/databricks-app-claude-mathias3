@@ -83,7 +83,8 @@
       "Bash(powershell -Command:*)",
       "Bash(./fix.sh)",
       "Bash(bun run prettier:*)",
-      "Bash(git rm:*)"
+      "Bash(git rm:*)",
+      "Bash(databricks workspace export:*)"
     ],
     "deny": [],
     "ask": []
