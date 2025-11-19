@@ -295,3 +295,6 @@ mlartifacts/
 
 # Generated client
 client/src/client/
+
+# Semantic model YAML (not part of source - for reference only)
+semantic_model.yaml

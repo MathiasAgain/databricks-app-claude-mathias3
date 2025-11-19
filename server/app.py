@@ -1,6 +1,7 @@
 """FastAPI application for Databricks App Template."""
 
 import os
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -14,6 +15,15 @@ from server.routers.genie import router as genie_router
 from server.routers.dashboard import router as dashboard_router
 from server.routers.test_claude import router as test_claude_router
 from server.routers.tools import router as tools_router
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(levelname)s:%(name)s:%(message)s'
+)
+
+# Set log level for all server modules to INFO
+logging.getLogger('server').setLevel(logging.INFO)
 
 
 # Load environment variables from .env.local if it exists

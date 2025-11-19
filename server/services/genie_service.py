@@ -71,36 +71,69 @@ class GenieService:
 
             from datetime import timedelta
 
+            # Use longer timeout to allow Genie to generate text responses
+            # Documentation shows Genie can return text attachments with natural language answers
             response = self.client.genie.start_conversation_and_wait(
                 space_id=self.space_id,
                 content=question,
-                timeout=timedelta(seconds=45)  # 45 second timeout to avoid gateway timeout
+                timeout=timedelta(seconds=120)  # 2 minute timeout for text generation
             )
 
             logger.info(f"[GENIE_SUCCESS] Got response from Genie")
 
-            # Extract natural language answer from response content
-            # This comes from the message content, not the attachments
-            genie_answer = getattr(response, 'content', '')
-            if genie_answer:
-                logger.info(f"[GENIE_ANSWER] Got response: {genie_answer[:100]}")
+            # Log the full response structure including status
+            logger.info(f"[GENIE_RESPONSE] Response type: {type(response)}")
+            logger.info(f"[GENIE_RESPONSE] Response status: {getattr(response, 'status', 'UNKNOWN')}")
+            logger.info(f"[GENIE_RESPONSE] Message ID: {getattr(response, 'message_id', 'N/A')}")
+            logger.info(f"[GENIE_RESPONSE] Response attributes: {dir(response)}")
+            try:
+                response_dict = response.as_dict()
+                logger.info(f"[GENIE_RESPONSE] Full response dict: {response_dict}")
+            except Exception as e:
+                logger.warning(f"[GENIE_RESPONSE] Could not serialize response: {e}")
 
-            # Extract SQL from the response
+            # Extract SQL and natural language answer from attachments
             # The Genie API returns a GenieMessage object with an attachments list
-            # Each attachment has a query: GenieQueryAttachment with a query field (string)
+            # Each attachment can have:
+            #   - query: GenieQueryAttachment with SQL query
+            #   - text: TextAttachment with natural language response (Genie's answer)
             sql = None
+            genie_answer = ""
             attachments = getattr(response, 'attachments', None)
 
             if attachments:
-                for attachment in attachments:
-                    # Check if attachment has query
+                logger.info(f"[GENIE_DEBUG] Processing {len(attachments)} attachments")
+                for i, attachment in enumerate(attachments):
+                    logger.info(f"[GENIE_DEBUG] Attachment {i}: type={type(attachment)}")
+
+                    # Log the full attachment structure using as_dict()
+                    try:
+                        attachment_dict = attachment.as_dict()
+                        logger.info(f"[GENIE_DEBUG] Attachment dict: {attachment_dict}")
+                    except Exception as e:
+                        logger.warning(f"[GENIE_DEBUG] Could not serialize attachment: {e}")
+
+                    # Extract natural language text response (Genie's answer)
+                    # Following official Databricks example: attachment.text.content
+                    text_obj = getattr(attachment, 'text', None)
+                    if text_obj and not genie_answer:
+                        text_content = getattr(text_obj, 'content', None)
+                        if text_content:
+                            genie_answer = text_content
+                            logger.info(
+                                f'[GENIE_TEXT] Found text answer: '
+                                f'{len(text_content)} chars'
+                            )
+
+                    # Extract SQL query
                     query_obj = getattr(attachment, 'query', None)
                     if query_obj:
-                        # Query object has the actual SQL in its 'query' field
-                        sql_text = getattr(query_obj, 'query', None)
-                        if sql_text:
-                            sql = sql_text
-                            break
+                        # Query object has the SQL query
+                        if not sql:
+                            sql_text = getattr(query_obj, 'query', None)
+                            if sql_text:
+                                sql = sql_text
+                                logger.info('[GENIE_SQL] Found SQL query')
             else:
                 logger.warning("[GENIE_NO_ATTACHMENTS] Response has no attachments")
 
