@@ -5,7 +5,7 @@
  * This is the primary page for the Nielsen Sales Analytics Assistant.
  */
 
-import { useState, useCallback, useEffect } from "react";
+import { useCallback } from "react";
 import { QueryInput } from "@/components/query/QueryInput";
 import { SuggestedQuestions } from "@/components/query/SuggestedQuestions";
 import { ResultsPanel } from "@/components/query/ResultsPanel";
@@ -15,22 +15,17 @@ import type { AskQuestionResponse } from "@/types/genie";
 import type { ChatRequest } from "@/types/claude";
 
 export default function AnalyticsPage() {
-  const [currentResult, setCurrentResult] =
-    useState<AskQuestionResponse | null>(null);
-  const [conversationHistory, setConversationHistory] = useState<
-    Array<{ role: string; content: string }>
-  >([]);
   const { mutate: askQuestion } = useAskQuestion();
   const { mutate: chatWithClaude, isPending: isChatPending } =
     useChatWithClaude();
 
-  // Get store state and actions
+  // Use store directly - no local state needed
   const currentQuery = useQueryStore((state) => state.currentQuery);
-  const storedConversationHistory = useQueryStore(
+  const conversationHistory = useQueryStore(
     (state) => state.conversationHistory,
   );
   const setCurrentQuery = useQueryStore((state) => state.setCurrentQuery);
-  const setStoredConversationHistory = useQueryStore(
+  const setConversationHistory = useQueryStore(
     (state) => state.setConversationHistory,
   );
   const clearConversationHistory = useQueryStore(
@@ -38,35 +33,13 @@ export default function AnalyticsPage() {
   );
   const addToHistory = useQueryStore((state) => state.addToHistory);
 
-  // Initialize from store on mount to restore state when navigating back
-  useEffect(() => {
-    if (currentQuery && !currentResult) {
-      setCurrentResult(currentQuery);
-    }
-    if (
-      storedConversationHistory.length > 0 &&
-      conversationHistory.length === 0
-    ) {
-      setConversationHistory(storedConversationHistory);
-    }
-  }, [
-    currentQuery,
-    currentResult,
-    storedConversationHistory,
-    conversationHistory,
-  ]);
-
   const handleQueryComplete = useCallback(
     (result: AskQuestionResponse) => {
-      setCurrentResult(result);
-      // Reset conversation when new query is run
-      setConversationHistory([]);
-
-      // Save to query store for visualization page
+      // Save to store - this persists to localStorage
       setCurrentQuery(result);
       addToHistory(result);
 
-      // Clear conversation history in store
+      // Clear conversation history for new query
       clearConversationHistory();
     },
     [setCurrentQuery, addToHistory, clearConversationHistory],
@@ -74,14 +47,14 @@ export default function AnalyticsPage() {
 
   const handleFollowupClick = useCallback(
     (question: string) => {
-      if (!currentResult) return;
+      if (!currentQuery) return;
 
       // Use Claude chat for follow-up questions instead of re-querying Genie
       const chatRequest: ChatRequest = {
         message: question,
         context: {
           conversationHistory,
-          currentQueryResults: currentResult.results,
+          currentQueryResults: currentQuery.results,
         },
       };
 
@@ -92,42 +65,31 @@ export default function AnalyticsPage() {
             { role: "assistant", content: chatResponse.message },
           ];
 
-          // Add to local conversation history
+          // Update conversation history in store
           const updatedHistory = [...conversationHistory, ...newMessages];
           setConversationHistory(updatedHistory);
 
-          // Save to store for persistence
-          setStoredConversationHistory(updatedHistory);
+          // Update the query with Claude's response and optional new visualization
+          const updatedQuery: AskQuestionResponse = {
+            ...currentQuery,
+            aiSummary: chatResponse.message,
+            suggestedFollowups: chatResponse.suggestedFollowups,
+            // Update visualization spec if provided in the response
+            ...(chatResponse.visualizationSpec && {
+              visualizationSpec: chatResponse.visualizationSpec,
+            }),
+          };
 
-          // Update the result with Claude's response and optional new visualization
-          const updatedResult = (prev) =>
-            prev
-              ? {
-                  ...prev,
-                  aiSummary: chatResponse.message,
-                  suggestedFollowups: chatResponse.suggestedFollowups,
-                  // Update visualization spec if provided in the response
-                  ...(chatResponse.visualizationSpec && {
-                    visualizationSpec: chatResponse.visualizationSpec,
-                  }),
-                }
-              : null;
-
-          setCurrentResult(updatedResult);
-
-          // Also update the store so the visualization page gets the new spec
-          const newResult = updatedResult(currentResult);
-          if (newResult) {
-            setCurrentQuery(newResult);
-          }
+          // Update store - this persists to localStorage
+          setCurrentQuery(updatedQuery);
         },
       });
     },
     [
-      currentResult,
+      currentQuery,
       conversationHistory,
       chatWithClaude,
-      setStoredConversationHistory,
+      setConversationHistory,
       setCurrentQuery,
     ],
   );
@@ -165,10 +127,10 @@ export default function AnalyticsPage() {
         </section>
 
         {/* Results Panel */}
-        {currentResult && (
+        {currentQuery && (
           <section className="fade-in">
             <ResultsPanel
-              result={currentResult}
+              result={currentQuery}
               onFollowupClick={handleFollowupClick}
               isProcessing={isChatPending}
             />
