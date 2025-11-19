@@ -6,29 +6,43 @@
  * based on their queries.
  */
 
-import { create } from 'zustand'
-import type { AskQuestionResponse, VisualizationSpec } from '../types'
+import { create } from "zustand";
+import type { AskQuestionResponse, VisualizationSpec } from "../types";
 
 // Re-export for convenience
-export type { VisualizationSpec }
+export type { VisualizationSpec };
 
 /**
  * Type alias for clarity
  */
-export type EnhancedQueryResponse = AskQuestionResponse
+export type EnhancedQueryResponse = AskQuestionResponse;
+
+/**
+ * Conversation message type
+ */
+export interface ConversationMessage {
+  role: string;
+  content: string;
+}
 
 interface QueryStore {
   // Current query response with visualization spec
-  currentQuery: EnhancedQueryResponse | null
+  currentQuery: EnhancedQueryResponse | null;
+
+  // Conversation history for follow-up questions
+  conversationHistory: ConversationMessage[];
 
   // History of queries (for future enhancement)
-  queryHistory: EnhancedQueryResponse[]
+  queryHistory: EnhancedQueryResponse[];
 
   // Actions
-  setCurrentQuery: (query: EnhancedQueryResponse) => void
-  clearCurrentQuery: () => void
-  addToHistory: (query: EnhancedQueryResponse) => void
-  clearHistory: () => void
+  setCurrentQuery: (query: EnhancedQueryResponse) => void;
+  clearCurrentQuery: () => void;
+  setConversationHistory: (history: ConversationMessage[]) => void;
+  addToConversation: (message: ConversationMessage) => void;
+  clearConversationHistory: () => void;
+  addToHistory: (query: EnhancedQueryResponse) => void;
+  clearHistory: () => void;
 }
 
 /**
@@ -37,15 +51,26 @@ interface QueryStore {
  */
 export const useQueryStore = create<QueryStore>((set) => ({
   currentQuery: null,
+  conversationHistory: [],
   queryHistory: [],
 
   setCurrentQuery: (query) => set({ currentQuery: query }),
 
   clearCurrentQuery: () => set({ currentQuery: null }),
 
-  addToHistory: (query) => set((state) => ({
-    queryHistory: [...state.queryHistory, query].slice(-10) // Keep last 10 queries
-  })),
+  setConversationHistory: (history) => set({ conversationHistory: history }),
 
-  clearHistory: () => set({ queryHistory: [] })
-}))
+  addToConversation: (message) =>
+    set((state) => ({
+      conversationHistory: [...state.conversationHistory, message],
+    })),
+
+  clearConversationHistory: () => set({ conversationHistory: [] }),
+
+  addToHistory: (query) =>
+    set((state) => ({
+      queryHistory: [...state.queryHistory, query].slice(-10), // Keep last 10 queries
+    })),
+
+  clearHistory: () => set({ queryHistory: [] }),
+}));

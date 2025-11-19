@@ -484,11 +484,65 @@ When discussing sales data and providing insights, consider which PSE pillar(s) 
                     )
                 )
 
-            # Add current message
+            # Add current message with visualization request
+            user_prompt = f"""{message}
+
+Please provide your response as a JSON object with this structure:
+{{
+  "message": "Your detailed response to the user's question",
+  "suggested_followups": ["3-5 relevant follow-up questions"],
+  "visualizationSpec": {{
+    "chartType": "bar|line|scatter|pie|heatmap|histogram|box|area|bubble - Include if requesting different chart type",
+    "title": "Chart title - Include if user wants to change the title",
+    "xAxis": {{"column": "column_name", "label": "X Label", "type": "category|linear|time|log"}},
+    "yAxis": {{"column": "column_name", "label": "Y Label", "type": "linear|log"}},
+    "groupBy": "optional: column for grouping/coloring",
+    "aggregation": "optional: sum|avg|count|min|max",
+    "colors": ["#1f77b4", "#ff7f0e", "#2ca02c"] - INCLUDE THIS if user requests color changes (e.g., 'make it blue', 'use red and green', 'change colors'). Use hex color codes or CSS color names. Single color for single-series charts, array of colors for multi-series or pie charts,
+    "annotations": [
+      {{
+        "text": "Label text",
+        "x": x_position_value,
+        "y": y_position_value
+      }}
+    ] - INCLUDE THIS if user requests annotations/labels (e.g., 'add a label at the peak', 'annotate the outlier', 'mark the threshold'). X and Y should be actual data values where the annotation should appear,
+    "reasoning": "Brief explanation of changes made"
+  }}
+}}
+
+**When to include visualizationSpec:**
+1. **Chart type change**: "show as pie chart", "visualize as line chart", "make it a scatter plot"
+2. **Color requests**: "make it blue", "use red and green colors", "change to our brand colors"
+3. **Annotation requests**: "add a label to the highest point", "annotate the outlier", "mark where it crosses 100"
+4. **Title changes**: "change the title to...", "rename the chart"
+5. **Combinations**: "make it blue and add a label at the peak"
+
+**When to OMIT visualizationSpec:**
+- User is just asking analytical questions about the data
+- User wants explanation or insights (not visual changes)
+
+**Color guidelines:**
+- Single color: ["#3b82f6"] for uniform coloring
+- Multiple colors: ["#ef4444", "#10b981", "#f59e0b"] for categories/series
+- Common requests:
+  - "blue" → ["#3b82f6"]
+  - "red" → ["#ef4444"]
+  - "green" → ["#10b981"]
+  - "red and green" → ["#ef4444", "#10b981"]
+  - "traffic light colors" → ["#ef4444", "#f59e0b", "#10b981"]
+
+**Annotation guidelines:**
+- Use actual data values for x and y positions
+- For "highest point": find max value in data, use its x and y coordinates
+- For "threshold at 100": use appropriate x value and y=100
+- Text should be concise and descriptive
+
+Return ONLY the JSON object, no other text."""
+
             messages.append(
                 ChatMessage(
                     role=ChatMessageRole.USER,
-                    content=message
+                    content=user_prompt
                 )
             )
 
@@ -518,14 +572,21 @@ When discussing sales data and providing insights, consider which PSE pillar(s) 
                 response_text = response.choices[0].message.content
                 logger.info(f"Chat response received: {len(response_text)} chars")
 
-                return {
-                    "message": response_text,
-                    "suggested_followups": [
-                        "Can you explain this in more detail?",
-                        "What are the key insights?",
-                        "What should I do next?"
-                    ]
-                }
+                # Try to parse as JSON to extract structured response
+                try:
+                    parsed = self._parse_chat_response(response_text)
+                    return parsed
+                except Exception as e:
+                    logger.warning(f"Failed to parse chat response as JSON: {e}, returning plain text")
+                    # Fallback to plain text response
+                    return {
+                        "message": response_text,
+                        "suggested_followups": [
+                            "Can you explain this in more detail?",
+                            "What are the key insights?",
+                            "What should I do next?"
+                        ]
+                    }
 
             return {
                 "message": "I'm having trouble processing your question. Could you rephrase it?",
@@ -595,3 +656,45 @@ When discussing sales data and providing insights, consider which PSE pillar(s) 
                 "followup_questions": [],
                 "insights": []
             }
+
+    def _parse_chat_response(self, response: str) -> Dict[str, Any]:
+        """
+        Parse Claude's chat response JSON.
+
+        Args:
+            response: Raw response text from Claude
+
+        Returns:
+            Parsed chat response dictionary with optional visualizationSpec
+        """
+        try:
+            # Try to extract JSON from response
+            # Claude might wrap it in markdown code blocks
+            if "```json" in response:
+                json_start = response.find("```json") + 7
+                json_end = response.find("```", json_start)
+                response = response[json_start:json_end].strip()
+            elif "```" in response:
+                json_start = response.find("```") + 3
+                json_end = response.find("```", json_start)
+                response = response[json_start:json_end].strip()
+
+            chat_data = json.loads(response)
+
+            # Build result with required fields
+            result = {
+                "message": chat_data.get("message", ""),
+                "suggested_followups": chat_data.get("suggested_followups", [])[:5]
+            }
+
+            # Extract visualization spec if present
+            if "visualizationSpec" in chat_data and chat_data["visualizationSpec"]:
+                result["visualization_spec"] = chat_data["visualizationSpec"]
+                logger.info(f"Chat response includes visualization spec: {chat_data['visualizationSpec'].get('chartType', 'unknown')}")
+
+            return result
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse chat response as JSON: {str(e)}")
+            logger.debug(f"Response was: {response}")
+            raise  # Re-raise to trigger fallback in caller

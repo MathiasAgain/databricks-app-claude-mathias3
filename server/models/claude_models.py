@@ -6,7 +6,7 @@ Defines request/response models for chat, analysis, and error explanation.
 
 from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Dict, Any
-from server.models.genie_models import QueryResults
+from server.models.genie_models import QueryResults, VisualizationSpec
 
 
 class ConversationContext(BaseModel):
@@ -55,6 +55,11 @@ class ChatResponse(BaseModel):
     confidence: float = Field(
         default=1.0,
         description="Confidence score for the response (0-1)"
+    )
+    visualization_spec: Optional[VisualizationSpec] = Field(
+        None,
+        description="Optional visualization specification if the follow-up warrants a new chart",
+        alias="visualizationSpec"
     )
 
 
