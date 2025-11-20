@@ -152,14 +152,15 @@ class VisualizationService:
         # Analyze data structure
         column_info = []
         for col in results.columns:
-            col_info = f"- {col.name} ({col.type})"
+            # columns is List[str], so col is already a string
+            col_info = f"- {col}"
             column_info.append(col_info)
 
         columns_desc = "\n".join(column_info)
 
         # Sample data for context (first few rows)
         sample_data = []
-        for i, row in enumerate(results.data[:3]):  # First 3 rows
+        for i, row in enumerate(results.rows[:3]):  # First 3 rows (use .rows not .data)
             sample_data.append(f"Row {i+1}: {json.dumps(row)}")
 
         sample_desc = "\n".join(sample_data) if sample_data else "No data available"
