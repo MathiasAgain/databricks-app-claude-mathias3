@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ResultsTable } from './ResultsTable'
 import { ChatInterface } from './ChatInterface'
-import { DataChart } from '@/components/charts/DataChart'
+import { PlotlyChart } from '@/components/charts/PlotlyChart'
 import type { AskQuestionResponse } from '@/types/genie'
 
 interface ResultsPanelProps {
@@ -156,7 +156,7 @@ export function ResultsPanel({ result, onFollowupClick, isProcessing }: ResultsP
         </CardHeader>
         {showChart && (
           <CardContent className="pt-6">
-            <DataChart results={result.results} />
+            <PlotlyChart results={result.results} visualizationSpec={result.visualizationSpec} />
           </CardContent>
         )}
       </Card>
