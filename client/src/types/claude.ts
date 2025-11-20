@@ -4,7 +4,7 @@
  * These types support chat, analysis, and error explanation features.
  */
 
-import type { QueryResults } from './genie'
+import type { QueryResults, VisualizationSpec } from './genie'
 
 export interface ConversationContext {
   conversationHistory: Array<{
@@ -12,6 +12,7 @@ export interface ConversationContext {
     content: string
   }>
   currentQueryResults?: QueryResults
+  currentVisualizationSpec?: VisualizationSpec
   dashboardState?: Record<string, any>
 }
 
@@ -24,6 +25,7 @@ export interface ChatResponse {
   message: string
   suggestedFollowups: string[]
   confidence: number
+  visualizationSpec?: VisualizationSpec
 }
 
 export interface AnalyzeRequest {

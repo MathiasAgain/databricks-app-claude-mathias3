@@ -55,6 +55,7 @@ export default function AnalyticsPage() {
         context: {
           conversationHistory,
           currentQueryResults: currentQuery.results,
+          currentVisualizationSpec: currentQuery.visualizationSpec,
         },
       };
 

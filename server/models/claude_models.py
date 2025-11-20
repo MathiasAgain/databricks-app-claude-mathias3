@@ -24,6 +24,11 @@ class ConversationContext(BaseModel):
         description="Current query results being discussed",
         alias="currentQueryResults"
     )
+    current_visualization_spec: Optional[VisualizationSpec] = Field(
+        None,
+        description="Current visualization specification for modification",
+        alias="currentVisualizationSpec"
+    )
     dashboard_state: Optional[Dict[str, Any]] = Field(
         None,
         description="Current dashboard state and filters",

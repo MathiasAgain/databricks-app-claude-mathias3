@@ -251,12 +251,8 @@ async def chat_with_claude(
                 "rows": request.context.current_query_results.rows,
                 "rowCount": request.context.current_query_results.rowCount
             }
-            # Extract current visualization spec if present
-            current_viz_spec = getattr(
-                request.context.current_query_results,
-                "visualizationSpec",
-                None
-            )
+        # Extract current visualization spec from context (separate field)
+        current_viz_spec = request.context.current_visualization_spec
 
         # Call Claude with tool calling support - it will decide routing intelligently
         logger.info(f"Calling Claude Sonnet with tool calling {'enabled' if current_viz_spec else 'disabled'}")
@@ -289,8 +285,9 @@ async def chat_with_claude(
 
                 # Call visualization service directly
                 viz_service = get_visualization_service()
+                # current_viz_spec is already a VisualizationSpec object from the model
                 updated_viz_spec = await viz_service.modify_visualization(
-                    current_spec=VisualizationSpec(**current_viz_spec.model_dump() if hasattr(current_viz_spec, 'model_dump') else current_viz_spec),
+                    current_spec=current_viz_spec,
                     results=results_obj,
                     modification_request=request.message
                 )
