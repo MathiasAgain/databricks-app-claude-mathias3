@@ -5,8 +5,10 @@ Provides REST API endpoints for:
 - Asking natural language questions
 - Getting suggested questions
 - Canceling running queries
+- Chatting with AI agents (analytics and visualization)
 """
 
+import asyncio
 import logging
 from fastapi import APIRouter, HTTPException, Depends
 from databricks.sdk import WorkspaceClient
@@ -18,6 +20,7 @@ from server.models import (
     ChatResponse
 )
 from server.services import GenieService, ClaudeService
+from server.services.visualization_service import get_visualization_service
 from server.services.user_service import get_workspace_client
 
 logger = logging.getLogger(__name__)
@@ -51,14 +54,15 @@ async def ask_question(
     This endpoint:
     1. Generates SQL from the natural language question using Genie
     2. Executes the SQL on the data warehouse
-    3. Uses Claude AI to analyze results and generate insights
-    4. Returns results with AI summary and context-aware follow-ups
+    3. Uses Claude Sonnet to analyze results and generate insights (parallel)
+    4. Uses Claude Haiku to generate optimal visualization (parallel)
+    5. Returns results with AI summary, chart, and context-aware follow-ups
 
     Args:
         request: Question request with optional context
 
     Returns:
-        AskQuestionResponse with SQL, results, and AI insights
+        AskQuestionResponse with SQL, results, AI insights, and visualization
 
     Raises:
         HTTPException: If query generation or execution fails
@@ -66,25 +70,52 @@ async def ask_question(
     try:
         logger.info(f"Received question: {request.question}")
 
-        # Use Genie service to generate and execute query
+        # Step 1: Use Genie service to generate and execute query
         genie_response = await genie_service.ask_question(request.question)
 
-        # Use Claude AI to analyze the results
-        logger.info("Analyzing results with Claude AI...")
-        analysis = await claude_service.analyze_query_results(
+        # Step 2: Call both AI agents in parallel for faster response
+        logger.info("Calling Claude (analytics) and Visualization agent in parallel...")
+
+        # Prepare results for agents
+        results_dict = {
+            "columns": genie_response.results.columns,
+            "rows": genie_response.results.rows,
+            "rowCount": genie_response.results.rowCount
+        }
+
+        # Create parallel tasks
+        analysis_task = claude_service.analyze_query_results(
             question=request.question,
             sql=genie_response.sql,
-            results={
-                "columns": genie_response.results.columns,
-                "rows": genie_response.results.rows,
-                "rowCount": genie_response.results.rowCount
-            }
+            results=results_dict
         )
 
-        # Build response with AI-generated insights
-        # Extract visualization spec from analysis if present
-        visualization_spec = analysis.get("visualization_spec")
+        viz_task = get_visualization_service().generate_visualization(
+            results=genie_response.results,
+            user_question=request.question,
+            analysis_context=None  # Could pass Claude's summary here in sequential mode
+        )
 
+        # Execute both tasks in parallel
+        analysis, visualization_spec = await asyncio.gather(
+            analysis_task,
+            viz_task,
+            return_exceptions=True  # Don't fail if one agent fails
+        )
+
+        # Handle potential errors from parallel execution
+        if isinstance(analysis, Exception):
+            logger.error(f"Claude analysis failed: {str(analysis)}")
+            analysis = {
+                "summary": "Analysis unavailable due to an error.",
+                "followup_questions": []
+            }
+
+        if isinstance(visualization_spec, Exception):
+            logger.error(f"Visualization generation failed: {str(visualization_spec)}")
+            visualization_spec = None
+
+        # Build response with AI-generated insights and visualization
         response = AskQuestionResponse(
             question=request.question,
             sql=genie_response.sql,
@@ -98,7 +129,7 @@ async def ask_question(
         )
 
         logger.info(
-            f"Question answered with AI analysis: "
+            f"Question answered with AI analysis and visualization: "
             f"{response.results.rowCount} rows in {response.executionTimeMs}ms"
         )
 
@@ -191,16 +222,17 @@ async def chat_with_claude(
     claude_service: ClaudeService = Depends(get_claude_service)
 ):
     """
-    Have a multi-turn conversation with Claude about query results.
+    Have a multi-turn conversation with AI agents about query results.
 
-    This endpoint enables conversational follow-ups where users can ask
-    Claude questions about the current query results in context.
+    This endpoint enables conversational follow-ups with smart routing:
+    - Analytical questions → Claude Sonnet (insights, trends, explanations)
+    - Visualization requests → Claude Haiku (chart modifications)
 
     Args:
         request: Chat request with message and conversation context
 
     Returns:
-        ChatResponse with Claude's message and suggested follow-ups
+        ChatResponse with AI message, optional visualization spec, and follow-ups
 
     Raises:
         HTTPException: If chat fails
@@ -210,29 +242,78 @@ async def chat_with_claude(
 
         # Extract query results from context if available
         query_results = None
+        current_viz_spec = None
         if request.context.current_query_results:
             query_results = {
                 "columns": request.context.current_query_results.columns,
                 "rows": request.context.current_query_results.rows,
                 "rowCount": request.context.current_query_results.rowCount
             }
+            # Extract current visualization spec if present
+            current_viz_spec = getattr(
+                request.context.current_query_results,
+                "visualizationSpec",
+                None
+            )
 
-        # Call Claude chat method
-        response = await claude_service.chat_with_context(
-            message=request.message,
-            conversation_history=request.context.conversation_history,
-            query_results=query_results
-        )
+        # Smart routing: Detect if this is a visualization request
+        viz_service = get_visualization_service()
+        is_viz_request = viz_service.is_visualization_request(request.message)
 
-        # Build response
-        chat_response = ChatResponse(
-            message=response["message"],
-            suggested_followups=response.get("suggested_followups", []),
-            confidence=1.0
-        )
+        if is_viz_request and current_viz_spec and query_results:
+            # Route to visualization agent for chart modifications
+            logger.info("Routing to Visualization agent (detected viz request)")
 
-        logger.info("Chat response sent successfully")
-        return chat_response
+            # Convert query_results dict to QueryResults object for visualization service
+            from server.models import QueryResults
+            results_obj = QueryResults(
+                columns=query_results["columns"],
+                rows=query_results["rows"],
+                rowCount=query_results["rowCount"]
+            )
+
+            # Modify visualization based on user request
+            new_viz_spec = await viz_service.modify_visualization(
+                current_spec=current_viz_spec,
+                results=results_obj,
+                modification_request=request.message
+            )
+
+            # Build response with updated visualization
+            chat_response = ChatResponse(
+                message="I've updated the visualization based on your request.",
+                suggested_followups=[
+                    "Change the colors",
+                    "Try a different chart type",
+                    "Add annotations to highlight key points"
+                ],
+                confidence=1.0,
+                visualizationSpec=new_viz_spec
+            )
+
+            logger.info(f"Visualization updated: {new_viz_spec.chartType if new_viz_spec else 'None'}")
+            return chat_response
+
+        else:
+            # Route to Claude for analytical questions
+            logger.info("Routing to Claude Sonnet (analytical question)")
+
+            # Call Claude chat method
+            response = await claude_service.chat_with_context(
+                message=request.message,
+                conversation_history=request.context.conversation_history,
+                query_results=query_results
+            )
+
+            # Build response (no visualization spec for analytical responses)
+            chat_response = ChatResponse(
+                message=response["message"],
+                suggested_followups=response.get("suggested_followups", []),
+                confidence=1.0
+            )
+
+            logger.info("Analytical response sent successfully")
+            return chat_response
 
     except Exception as e:
         logger.error(f"Failed to process chat request: {str(e)}")

@@ -484,58 +484,25 @@ When discussing sales data and providing insights, consider which PSE pillar(s) 
                     )
                 )
 
-            # Add current message with visualization request
+            # Add current message - focus on analytics only
             user_prompt = f"""{message}
 
 Please provide your response as a JSON object with this structure:
 {{
-  "message": "Your detailed response to the user's question",
-  "suggested_followups": ["3-5 relevant follow-up questions"],
-  "visualizationSpec": {{
-    "chartType": "bar|line|scatter|pie|heatmap|histogram|box|area|bubble - Include if requesting different chart type",
-    "title": "Chart title - Include if user wants to change the title",
-    "xAxis": {{"column": "column_name", "label": "X Label", "type": "category|linear|time|log"}},
-    "yAxis": {{"column": "column_name", "label": "Y Label", "type": "linear|log"}},
-    "groupBy": "optional: column for grouping/coloring",
-    "aggregation": "optional: sum|avg|count|min|max",
-    "colors": ["#1f77b4", "#ff7f0e", "#2ca02c"] - INCLUDE THIS if user requests color changes (e.g., 'make it blue', 'use red and green', 'change colors'). Use hex color codes or CSS color names. Single color for single-series charts, array of colors for multi-series or pie charts,
-    "annotations": [
-      {{
-        "text": "Label text",
-        "x": x_position_value,
-        "y": y_position_value
-      }}
-    ] - INCLUDE THIS if user requests annotations/labels (e.g., 'add a label at the peak', 'annotate the outlier', 'mark the threshold'). X and Y should be actual data values where the annotation should appear,
-    "reasoning": "Brief explanation of changes made"
-  }}
+  "message": "Your detailed analytical response to the user's question",
+  "suggested_followups": ["3-5 relevant follow-up questions"]
 }}
 
-**When to include visualizationSpec:**
-1. **Chart type change**: "show as pie chart", "visualize as line chart", "make it a scatter plot"
-2. **Color requests**: "make it blue", "use red and green colors", "change to our brand colors"
-3. **Annotation requests**: "add a label to the highest point", "annotate the outlier", "mark where it crosses 100"
-4. **Title changes**: "change the title to...", "rename the chart"
-5. **Combinations**: "make it blue and add a label at the peak"
+**Your Focus:**
+- Provide clear, actionable business insights
+- Explain trends, patterns, and anomalies in the data
+- Give recommendations based on PSE framework when relevant
+- Suggest analytical next steps or follow-up questions
 
-**When to OMIT visualizationSpec:**
-- User is just asking analytical questions about the data
-- User wants explanation or insights (not visual changes)
-
-**Color guidelines:**
-- Single color: ["#3b82f6"] for uniform coloring
-- Multiple colors: ["#ef4444", "#10b981", "#f59e0b"] for categories/series
-- Common requests:
-  - "blue" → ["#3b82f6"]
-  - "red" → ["#ef4444"]
-  - "green" → ["#10b981"]
-  - "red and green" → ["#ef4444", "#10b981"]
-  - "traffic light colors" → ["#ef4444", "#f59e0b", "#10b981"]
-
-**Annotation guidelines:**
-- Use actual data values for x and y positions
-- For "highest point": find max value in data, use its x and y coordinates
-- For "threshold at 100": use appropriate x value and y=100
-- Text should be concise and descriptive
+**Avoid:**
+- Do NOT include chart types, colors, or visualization instructions
+- Focus purely on data analysis and business insights
+- Visualization is handled by a separate system
 
 Return ONLY the JSON object, no other text."""
 
@@ -659,13 +626,13 @@ Return ONLY the JSON object, no other text."""
 
     def _parse_chat_response(self, response: str) -> Dict[str, Any]:
         """
-        Parse Claude's chat response JSON.
+        Parse Claude's chat response JSON (analytics only).
 
         Args:
             response: Raw response text from Claude
 
         Returns:
-            Parsed chat response dictionary with optional visualizationSpec
+            Parsed chat response dictionary with analytics insights
         """
         try:
             # Try to extract JSON from response
@@ -681,16 +648,11 @@ Return ONLY the JSON object, no other text."""
 
             chat_data = json.loads(response)
 
-            # Build result with required fields
+            # Build result with analytics fields only
             result = {
                 "message": chat_data.get("message", ""),
                 "suggested_followups": chat_data.get("suggested_followups", [])[:5]
             }
-
-            # Extract visualization spec if present
-            if "visualizationSpec" in chat_data and chat_data["visualizationSpec"]:
-                result["visualization_spec"] = chat_data["visualizationSpec"]
-                logger.info(f"Chat response includes visualization spec: {chat_data['visualizationSpec'].get('chartType', 'unknown')}")
 
             return result
 
