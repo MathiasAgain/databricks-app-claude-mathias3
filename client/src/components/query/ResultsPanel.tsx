@@ -17,10 +17,11 @@ import type { AskQuestionResponse } from '@/types/genie'
 interface ResultsPanelProps {
   result: AskQuestionResponse
   onFollowupClick?: (question: string) => void
+  onNewQuery?: (question: string) => void
   isProcessing?: boolean
 }
 
-export function ResultsPanel({ result, onFollowupClick, isProcessing }: ResultsPanelProps) {
+export function ResultsPanel({ result, onFollowupClick, onNewQuery, isProcessing }: ResultsPanelProps) {
   const [showChart, setShowChart] = useState(true)
 
   return (
@@ -168,6 +169,7 @@ export function ResultsPanel({ result, onFollowupClick, isProcessing }: ResultsP
       <ChatInterface
         queryResults={result.results}
         onSendMessage={onFollowupClick}
+        onNewQuery={onNewQuery}
         isProcessing={isProcessing}
       />
     </div>

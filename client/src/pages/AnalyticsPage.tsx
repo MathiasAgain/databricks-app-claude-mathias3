@@ -94,6 +94,22 @@ export default function AnalyticsPage() {
     ],
   );
 
+  const handleNewQuery = useCallback(
+    (question: string) => {
+      // Use askQuestion for new data queries via Genie
+      askQuestion(
+        { question },
+        {
+          onSuccess: (result) => {
+            // Save to store and clear conversation history
+            handleQueryComplete(result);
+          },
+        },
+      );
+    },
+    [askQuestion, handleQueryComplete],
+  );
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
       {/* Left Sidebar - Suggested Questions */}
@@ -132,6 +148,7 @@ export default function AnalyticsPage() {
             <ResultsPanel
               result={currentQuery}
               onFollowupClick={handleFollowupClick}
+              onNewQuery={handleNewQuery}
               isProcessing={isChatPending}
             />
           </section>
