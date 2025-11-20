@@ -36,14 +36,17 @@ class ClaudeService:
         self.client = workspace_client
         self.endpoint_name = "databricks-claude-sonnet-4-5"
 
-    def _get_tool_definitions(self) -> List[Dict[str, Any]]:
+    def _get_tool_definitions(self, include_visualization: bool = False) -> List[Dict[str, Any]]:
         """
         Define tools available to Claude.
+
+        Args:
+            include_visualization: Whether to include visualization modification tool
 
         Returns:
             List of tool definitions in OpenAI format
         """
-        return [
+        tools = [
             {
                 "type": "function",
                 "function": {
@@ -80,32 +83,108 @@ class ClaudeService:
             }
         ]
 
-    async def _execute_tool(self, tool_name: str, tool_input: Dict[str, Any]) -> Dict[str, Any]:
+        # Add visualization tool if requested (for chat endpoint)
+        if include_visualization:
+            tools.append({
+                "type": "function",
+                "function": {
+                    "name": "modify_visualization",
+                    "description": "Modify the current chart's appearance including colors, chart type, styling, annotations, and labels. Use this when the user wants to change how the data is visualized (e.g., 'make it yellow', 'change to pie chart', 'add labels').",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "modification_request": {
+                                "type": "string",
+                                "description": "What the user wants to change about the visualization"
+                            }
+                        },
+                        "required": ["modification_request"]
+                    }
+                }
+            })
+
+        return tools
+
+    async def _execute_tool(
+        self,
+        tool_name: str,
+        tool_input: Dict[str, Any],
+        context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
         Execute a tool by calling tool functions directly.
 
         Args:
             tool_name: Name of the tool to execute
             tool_input: Input parameters for the tool
+            context: Additional context (e.g., current visualization, query results)
 
         Returns:
             Tool execution result
         """
         try:
-            # Import tool functions dynamically to avoid circular imports
-            from server.routers.tools import get_competitor_pricing, get_market_trend
-
             logger.info(f"Executing tool: {tool_name} with input: {tool_input}")
 
             # Call the appropriate tool function
             if tool_name == "get_competitor_pricing":
+                # Import tool functions dynamically to avoid circular imports
+                from server.routers.tools import get_competitor_pricing
                 result = await get_competitor_pricing(product=tool_input.get("product", ""))
+
             elif tool_name == "get_market_trend":
+                from server.routers.tools import get_market_trend
                 result = await get_market_trend(category=tool_input.get("category", ""))
+
+            elif tool_name == "modify_visualization":
+                # Import visualization service
+                from server.services.visualization_service import get_visualization_service
+                from server.models import QueryResults, VisualizationSpec
+
+                viz_service = get_visualization_service()
+                modification_request = tool_input.get("modification_request", "")
+
+                # Get current viz spec and query results from context
+                if not context:
+                    return {"error": "No context provided for visualization modification"}
+
+                current_viz_spec = context.get("current_viz_spec")
+                query_results = context.get("query_results")
+
+                if not current_viz_spec:
+                    return {"error": "No visualization currently displayed"}
+
+                if not query_results:
+                    return {"error": "No query results available"}
+
+                # Convert dict to QueryResults object
+                results_obj = QueryResults(
+                    columns=query_results["columns"],
+                    rows=query_results["rows"],
+                    rowCount=query_results["rowCount"]
+                )
+
+                # Call visualization service to modify
+                new_viz_spec = await viz_service.modify_visualization(
+                    current_spec=current_viz_spec,
+                    results=results_obj,
+                    modification_request=modification_request
+                )
+
+                if new_viz_spec:
+                    result = {
+                        "success": True,
+                        "visualization_spec": new_viz_spec.model_dump(by_alias=True),
+                        "message": "Visualization updated successfully"
+                    }
+                else:
+                    result = {
+                        "success": False,
+                        "error": "Failed to generate updated visualization"
+                    }
             else:
                 return {"error": f"Unknown tool: {tool_name}"}
 
-            logger.info(f"Tool {tool_name} returned: {result}")
+            logger.info(f"Tool {tool_name} completed successfully")
             return result
 
         except Exception as e:
@@ -414,20 +493,23 @@ Provide a JSON response with the following structure:
         self,
         message: str,
         conversation_history: List[Dict[str, str]],
-        query_results: Optional[Dict[str, Any]] = None
+        query_results: Optional[Dict[str, Any]] = None,
+        current_viz_spec: Optional[Any] = None
     ) -> Dict[str, Any]:
         """
-        Chat with Claude in the context of query results with timeout protection.
+        Chat with Claude in the context of query results with tool calling support.
 
         Args:
             message: User's message/question
             conversation_history: Previous messages in the conversation
             query_results: Current query results being discussed (optional)
+            current_viz_spec: Current visualization spec (enables viz modification tool)
 
         Returns:
             Dict with:
                 - message: Claude's response
                 - suggested_followups: List of suggested follow-up questions
+                - visualization_spec: Updated visualization (if modify_visualization tool was called)
         """
         try:
             from databricks.sdk.service.serving import ChatMessage, ChatMessageRole
@@ -484,8 +566,28 @@ When discussing sales data and providing insights, consider which PSE pillar(s) 
                     )
                 )
 
-            # Add current message - focus on analytics only
-            user_prompt = f"""{message}
+            # Add current message - focus on analytics, but mention visualization tool if available
+            if current_viz_spec:
+                user_prompt = f"""{message}
+
+You have access to a modify_visualization tool that can update the current chart. Use it when the user asks to change visualization appearance (colors, chart type, styling, etc.).
+
+For analytical questions, provide your response as a JSON object with this structure:
+{{
+  "message": "Your detailed analytical response to the user's question",
+  "suggested_followups": ["3-5 relevant follow-up questions"]
+}}
+
+**Your Focus:**
+- Provide clear, actionable business insights
+- Explain trends, patterns, and anomalies in the data
+- Give recommendations based on PSE framework when relevant
+- Use modify_visualization tool for visualization changes (colors, chart types, etc.)
+- For analytical questions, respond with JSON
+
+Return ONLY the JSON object for analytical responses, no other text."""
+            else:
+                user_prompt = f"""{message}
 
 Please provide your response as a JSON object with this structure:
 {{
@@ -499,11 +601,6 @@ Please provide your response as a JSON object with this structure:
 - Give recommendations based on PSE framework when relevant
 - Suggest analytical next steps or follow-up questions
 
-**Avoid:**
-- Do NOT include chart types, colors, or visualization instructions
-- Focus purely on data analysis and business insights
-- Visualization is handled by a separate system
-
 Return ONLY the JSON object, no other text."""
 
             messages.append(
@@ -513,17 +610,26 @@ Return ONLY the JSON object, no other text."""
                 )
             )
 
-            # Call Claude with timeout protection
-            logger.info(f"Calling Claude for chat response with {CLAUDE_CHAT_TIMEOUT}s timeout...")
+            # Enable visualization tool if current viz spec is available
+            has_viz_tool = current_viz_spec is not None
+            tools = self._get_tool_definitions(include_visualization=has_viz_tool) if has_viz_tool else []
+
+            # Call Claude with timeout protection and tool support
+            logger.info(f"Calling Claude for chat response with {CLAUDE_CHAT_TIMEOUT}s timeout, tools={'enabled' if has_viz_tool else 'disabled'}...")
 
             async def call_claude():
                 """Wrapper to make SDK call awaitable."""
+                kwargs = {
+                    "name": self.endpoint_name,
+                    "messages": messages,
+                    "max_tokens": 1500,
+                    "temperature": 0.7
+                }
+                if has_viz_tool and tools:
+                    kwargs["tools"] = tools
                 return await asyncio.to_thread(
                     self.client.serving_endpoints.query,
-                    name=self.endpoint_name,
-                    messages=messages,
-                    max_tokens=1500,
-                    temperature=0.7
+                    **kwargs
                 )
 
             try:
@@ -534,9 +640,61 @@ Return ONLY the JSON object, no other text."""
                     "message": "Response is taking longer than expected. Please try rephrasing your question.",
                     "suggested_followups": []
                 }
+            except TypeError as e:
+                # Tools not supported, retry without tools
+                if "unexpected keyword argument 'tools'" in str(e):
+                    logger.warning("Tools not supported, falling back to non-tool chat")
+                    async def call_claude_no_tools():
+                        return await asyncio.to_thread(
+                            self.client.serving_endpoints.query,
+                            name=self.endpoint_name,
+                            messages=messages,
+                            max_tokens=1500,
+                            temperature=0.7
+                        )
+                    response = await asyncio.wait_for(call_claude_no_tools(), timeout=CLAUDE_CHAT_TIMEOUT)
+                else:
+                    raise
 
+            # Check for tool calls in response
             if response.choices and len(response.choices) > 0:
-                response_text = response.choices[0].message.content
+                message_response = response.choices[0].message
+
+                # Handle tool calls (visualization modification)
+                if hasattr(message_response, 'tool_calls') and message_response.tool_calls:
+                    logger.info(f"Claude requested {len(message_response.tool_calls)} tool calls")
+
+                    for tool_call in message_response.tool_calls:
+                        tool_name = tool_call.function.name
+                        tool_input = json.loads(tool_call.function.arguments)
+
+                        if tool_name == "modify_visualization":
+                            # Execute visualization modification
+                            context = {
+                                "current_viz_spec": current_viz_spec,
+                                "query_results": query_results
+                            }
+                            tool_result = await self._execute_tool(tool_name, tool_input, context)
+
+                            if tool_result.get("success"):
+                                # Return the updated visualization spec
+                                return {
+                                    "message": "I've updated the visualization based on your request.",
+                                    "suggested_followups": [
+                                        "Change the colors",
+                                        "Try a different chart type",
+                                        "Add annotations"
+                                    ],
+                                    "visualization_spec": tool_result["visualization_spec"]
+                                }
+                            else:
+                                return {
+                                    "message": f"I couldn't update the visualization: {tool_result.get('error', 'Unknown error')}",
+                                    "suggested_followups": []
+                                }
+
+                # No tool calls - parse as regular analytical response
+                response_text = message_response.content
                 logger.info(f"Chat response received: {len(response_text)} chars")
 
                 # Try to parse as JSON to extract structured response

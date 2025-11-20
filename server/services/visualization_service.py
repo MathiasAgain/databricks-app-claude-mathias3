@@ -298,8 +298,9 @@ Return ONLY a JSON object with the complete modified specification (same structu
         """
         viz_keywords = [
             "chart", "graph", "plot", "visualize", "visualization",
-            "color", "blue", "red", "green", "pie", "bar", "line",
-            "scatter", "make it", "show as", "change to", "convert",
+            "color", "colour", "blue", "red", "green", "yellow", "orange", "purple",
+            "black", "white", "pink", "cyan", "magenta", "gray", "grey", "brown",
+            "pie", "bar", "line", "scatter", "make it", "show as", "change to", "convert",
             "annotation", "label", "title", "axis"
         ]
 

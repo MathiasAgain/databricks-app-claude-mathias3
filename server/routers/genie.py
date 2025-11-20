@@ -224,9 +224,11 @@ async def chat_with_claude(
     """
     Have a multi-turn conversation with AI agents about query results.
 
-    This endpoint enables conversational follow-ups with smart routing:
-    - Analytical questions → Claude Sonnet (insights, trends, explanations)
-    - Visualization requests → Claude Haiku (chart modifications)
+    This endpoint uses Claude's intelligent tool calling to route requests:
+    - Claude Sonnet analyzes the user's message and decides whether to:
+      1. Provide analytical insights (default)
+      2. Call the modify_visualization tool for chart changes
+    - No keyword matching needed - Claude understands context and intent
 
     Args:
         request: Chat request with message and conversation context
@@ -240,7 +242,7 @@ async def chat_with_claude(
     try:
         logger.info(f"Chat request: {request.message}")
 
-        # Extract query results from context if available
+        # Extract query results and visualization spec from context
         query_results = None
         current_viz_spec = None
         if request.context.current_query_results:
@@ -256,64 +258,30 @@ async def chat_with_claude(
                 None
             )
 
-        # Smart routing: Detect if this is a visualization request
-        viz_service = get_visualization_service()
-        is_viz_request = viz_service.is_visualization_request(request.message)
+        # Call Claude with tool calling support - it will decide routing intelligently
+        logger.info(f"Calling Claude Sonnet with tool calling {'enabled' if current_viz_spec else 'disabled'}")
 
-        if is_viz_request and current_viz_spec and query_results:
-            # Route to visualization agent for chart modifications
-            logger.info("Routing to Visualization agent (detected viz request)")
+        response = await claude_service.chat_with_context(
+            message=request.message,
+            conversation_history=request.context.conversation_history,
+            query_results=query_results,
+            current_viz_spec=current_viz_spec  # Enables modify_visualization tool
+        )
 
-            # Convert query_results dict to QueryResults object for visualization service
-            from server.models import QueryResults
-            results_obj = QueryResults(
-                columns=query_results["columns"],
-                rows=query_results["rows"],
-                rowCount=query_results["rowCount"]
-            )
+        # Build response - visualization_spec will be present if Claude called the tool
+        chat_response = ChatResponse(
+            message=response["message"],
+            suggested_followups=response.get("suggested_followups", []),
+            confidence=1.0,
+            visualizationSpec=response.get("visualization_spec")  # Updated viz if tool was called
+        )
 
-            # Modify visualization based on user request
-            new_viz_spec = await viz_service.modify_visualization(
-                current_spec=current_viz_spec,
-                results=results_obj,
-                modification_request=request.message
-            )
-
-            # Build response with updated visualization
-            chat_response = ChatResponse(
-                message="I've updated the visualization based on your request.",
-                suggested_followups=[
-                    "Change the colors",
-                    "Try a different chart type",
-                    "Add annotations to highlight key points"
-                ],
-                confidence=1.0,
-                visualizationSpec=new_viz_spec
-            )
-
-            logger.info(f"Visualization updated: {new_viz_spec.chartType if new_viz_spec else 'None'}")
-            return chat_response
-
+        if response.get("visualization_spec"):
+            logger.info("Claude called modify_visualization tool - returning updated chart")
         else:
-            # Route to Claude for analytical questions
-            logger.info("Routing to Claude Sonnet (analytical question)")
+            logger.info("Claude provided analytical response")
 
-            # Call Claude chat method
-            response = await claude_service.chat_with_context(
-                message=request.message,
-                conversation_history=request.context.conversation_history,
-                query_results=query_results
-            )
-
-            # Build response (no visualization spec for analytical responses)
-            chat_response = ChatResponse(
-                message=response["message"],
-                suggested_followups=response.get("suggested_followups", []),
-                confidence=1.0
-            )
-
-            logger.info("Analytical response sent successfully")
-            return chat_response
+        return chat_response
 
     except Exception as e:
         logger.error(f"Failed to process chat request: {str(e)}")
