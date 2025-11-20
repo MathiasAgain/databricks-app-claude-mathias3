@@ -44,6 +44,15 @@ class GenieResponse(BaseModel):
     cached: bool = Field(default=False, description="True if results were from cache")
 
 
+class FontConfig(BaseModel):
+    """Font configuration for chart elements."""
+
+    size: Optional[int] = Field(None, description="Font size in pixels")
+    family: Optional[str] = Field(None, description="Font family (e.g., 'Arial', 'Courier')")
+    color: Optional[str] = Field(None, description="Font color (hex or named)")
+    weight: Optional[str] = Field(None, description="Font weight (normal, bold)")
+
+
 class AxisConfig(BaseModel):
     """Configuration for a chart axis."""
 
@@ -53,18 +62,42 @@ class AxisConfig(BaseModel):
         None,
         description="Axis type: category, linear, time, or log"
     )
+    range: Optional[List[float]] = Field(None, description="Axis range [min, max]")
+    tickFormat: Optional[str] = Field(None, description="Tick format string (e.g., '.2f', '$,.0f')")
+    showGrid: Optional[bool] = Field(None, description="Show grid lines")
+    font: Optional[FontConfig] = Field(None, description="Axis label font configuration")
 
 
 class AnnotationConfig(BaseModel):
     """Configuration for chart annotations."""
 
     text: str = Field(..., description="Annotation text")
-    x: Optional[float] = Field(None, description="X position")
-    y: Optional[float] = Field(None, description="Y position")
+    x: Optional[Any] = Field(None, description="X position (can be value or 'paper')")
+    y: Optional[Any] = Field(None, description="Y position (can be value or 'paper')")
+    xref: Optional[str] = Field(None, description="X reference: 'x' or 'paper'")
+    yref: Optional[str] = Field(None, description="Y reference: 'y' or 'paper'")
+    font: Optional[FontConfig] = Field(None, description="Annotation font configuration")
+    showarrow: Optional[bool] = Field(None, description="Show arrow pointing to annotation")
+    arrowhead: Optional[int] = Field(None, description="Arrow style (0-8)")
+    ax: Optional[int] = Field(None, description="Arrow X offset")
+    ay: Optional[int] = Field(None, description="Arrow Y offset")
+    bgcolor: Optional[str] = Field(None, description="Background color")
+    bordercolor: Optional[str] = Field(None, description="Border color")
+
+
+class LayoutConfig(BaseModel):
+    """Configuration for chart layout."""
+
+    width: Optional[int] = Field(None, description="Chart width in pixels")
+    height: Optional[int] = Field(None, description="Chart height in pixels")
+    showlegend: Optional[bool] = Field(None, description="Show legend")
+    legendPosition: Optional[str] = Field(None, description="Legend position: 'top-right', 'bottom', etc.")
+    margin: Optional[Dict[str, int]] = Field(None, description="Margins {l, r, t, b}")
+    titleFont: Optional[FontConfig] = Field(None, description="Title font configuration")
 
 
 class VisualizationSpec(BaseModel):
-    """AI-generated visualization specification."""
+    """AI-generated visualization specification with advanced customization."""
 
     chartType: str = Field(
         ...,
@@ -82,7 +115,11 @@ class VisualizationSpec(BaseModel):
     colors: Optional[List[str]] = Field(None, description="Custom color palette")
     annotations: Optional[List[AnnotationConfig]] = Field(
         None,
-        description="Chart annotations"
+        description="Chart annotations with advanced styling"
+    )
+    layout: Optional[LayoutConfig] = Field(
+        None,
+        description="Chart layout configuration (size, margins, legend)"
     )
     reasoning: Optional[str] = Field(
         None,

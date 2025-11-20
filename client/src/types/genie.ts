@@ -23,18 +23,58 @@ export interface AskQuestionRequest {
 /**
  * Visualization specification from AI
  */
+
+/** Font configuration for chart elements */
+export interface FontConfig {
+  size?: number
+  family?: string
+  color?: string
+  weight?: string
+}
+
+/** Enhanced axis configuration with styling */
 export interface VisualizationAxis {
   column: string
   label?: string
   type?: 'category' | 'linear' | 'time' | 'log'
+  range?: [number, number]
+  tickFormat?: string
+  showGrid?: boolean
+  font?: FontConfig
 }
 
+/** Enhanced annotation configuration with advanced styling */
 export interface VisualizationAnnotation {
   text: string
-  x?: number
-  y?: number
+  x?: any
+  y?: any
+  xref?: string
+  yref?: string
+  font?: FontConfig
+  showarrow?: boolean
+  arrowhead?: number
+  ax?: number
+  ay?: number
+  bgcolor?: string
+  bordercolor?: string
 }
 
+/** Chart layout configuration */
+export interface LayoutConfig {
+  width?: number
+  height?: number
+  showlegend?: boolean
+  legendPosition?: string
+  margin?: {
+    l?: number
+    r?: number
+    t?: number
+    b?: number
+  }
+  titleFont?: FontConfig
+}
+
+/** Complete visualization specification */
 export interface VisualizationSpec {
   chartType: string
   title?: string
@@ -45,6 +85,7 @@ export interface VisualizationSpec {
   aggregation?: 'sum' | 'avg' | 'count' | 'min' | 'max'
   colors?: string[]
   annotations?: VisualizationAnnotation[]
+  layout?: LayoutConfig
   reasoning?: string
 }
 

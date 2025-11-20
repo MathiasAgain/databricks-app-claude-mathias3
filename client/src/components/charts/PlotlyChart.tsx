@@ -250,58 +250,148 @@ function generateLayout(
   const textColor = isDarkMode ? '#e5e5e5' : '#333333'
   const gridColor = isDarkMode ? '#333333' : '#e5e5e5'
 
-  const baseLayout: Partial<Plotly.Layout> = {
-    title: {
-      text: spec.title || 'Data Visualization',
-      font: {
-        size: 18,
-        color: textColor,
-      },
+  // Build title configuration with font customization
+  const titleFont = spec.layout?.titleFont || {}
+  const titleConfig: Partial<Plotly.Layout['title']> = {
+    text: spec.title || 'Data Visualization',
+    font: {
+      size: titleFont.size || 18,
+      family: titleFont.family,
+      color: titleFont.color || textColor,
+      // @ts-ignore - Plotly types don't include weight but it's valid
+      weight: titleFont.weight,
     },
+  }
+
+  // Build margin configuration
+  const margin = spec.layout?.margin || { l: 60, r: 40, t: 80, b: 60 }
+
+  // Determine legend visibility and position
+  const showlegend = spec.layout?.showlegend !== undefined
+    ? spec.layout.showlegend
+    : !['pie', 'histogram'].includes(spec.chartType.toLowerCase())
+
+  // Map legend position string to Plotly format
+  const legendPosition = spec.layout?.legendPosition || 'top-right'
+  const legendConfig: Partial<Plotly.Legend> = {}
+
+  if (legendPosition.includes('top')) {
+    legendConfig.y = 1
+    legendConfig.yanchor = 'top'
+  } else if (legendPosition.includes('bottom')) {
+    legendConfig.y = 0
+    legendConfig.yanchor = 'bottom'
+  }
+
+  if (legendPosition.includes('right')) {
+    legendConfig.x = 1
+    legendConfig.xanchor = 'right'
+  } else if (legendPosition.includes('left')) {
+    legendConfig.x = 0
+    legendConfig.xanchor = 'left'
+  }
+
+  const baseLayout: Partial<Plotly.Layout> = {
+    title: titleConfig,
     paper_bgcolor: bgColor,
     plot_bgcolor: bgColor,
     font: {
       color: textColor,
     },
     hovermode: 'closest',
-    showlegend: !['pie', 'histogram'].includes(spec.chartType.toLowerCase()),
-    margin: {
-      l: 60,
-      r: 40,
-      t: 80,
-      b: 60,
-    },
+    showlegend,
+    legend: legendConfig,
+    margin,
+    width: spec.layout?.width,
+    height: spec.layout?.height,
   }
 
   // Add axis configurations for charts that support them
   if (!['pie', '3d-scatter'].includes(spec.chartType.toLowerCase())) {
+    // X-Axis configuration with enhanced features
+    const xAxisFont = spec.xAxis?.font || {}
     baseLayout.xaxis = {
-      title: spec.xAxis?.label || spec.xAxis?.column || '',
-      gridcolor: gridColor,
+      title: {
+        text: spec.xAxis?.label || spec.xAxis?.column || '',
+        font: {
+          size: xAxisFont.size,
+          family: xAxisFont.family,
+          color: xAxisFont.color || textColor,
+        },
+      },
+      gridcolor: spec.xAxis?.showGrid === false ? 'transparent' : gridColor,
       color: textColor,
       type: spec.xAxis?.type as any || 'category',
+      range: spec.xAxis?.range as [number, number] | undefined,
+      tickformat: spec.xAxis?.tickFormat,
+      showgrid: spec.xAxis?.showGrid !== false,
     }
 
+    // Y-Axis configuration with enhanced features
+    const yAxisFont = spec.yAxis?.font || {}
     baseLayout.yaxis = {
-      title: spec.yAxis?.label || spec.yAxis?.column || '',
-      gridcolor: gridColor,
+      title: {
+        text: spec.yAxis?.label || spec.yAxis?.column || '',
+        font: {
+          size: yAxisFont.size,
+          family: yAxisFont.family,
+          color: yAxisFont.color || textColor,
+        },
+      },
+      gridcolor: spec.yAxis?.showGrid === false ? 'transparent' : gridColor,
       color: textColor,
       type: spec.yAxis?.type as any || 'linear',
+      range: spec.yAxis?.range as [number, number] | undefined,
+      tickformat: spec.yAxis?.tickFormat,
+      showgrid: spec.yAxis?.showGrid !== false,
+    }
+
+    // Z-Axis configuration for 3D charts
+    if (spec.zAxis) {
+      const zAxisFont = spec.zAxis.font || {}
+      baseLayout.scene = {
+        zaxis: {
+          title: {
+            text: spec.zAxis.label || spec.zAxis.column || '',
+            font: {
+              size: zAxisFont.size,
+              family: zAxisFont.family,
+              color: zAxisFont.color || textColor,
+            },
+          },
+          type: spec.zAxis.type as any || 'linear',
+          range: spec.zAxis.range as [number, number] | undefined,
+          tickformat: spec.zAxis.tickFormat,
+        },
+      }
     }
   }
 
-  // Add annotations if specified
+  // Add enhanced annotations if specified
   if (spec.annotations && spec.annotations.length > 0) {
-    baseLayout.annotations = spec.annotations.map(ann => ({
-      text: ann.text,
-      x: ann.x,
-      y: ann.y,
-      showarrow: true,
-      arrowhead: 2,
-      font: {
-        color: textColor,
-      },
-    }))
+    baseLayout.annotations = spec.annotations.map(ann => {
+      const annFont = ann.font || {}
+      return {
+        text: ann.text,
+        x: ann.x,
+        y: ann.y,
+        xref: ann.xref || 'x',
+        yref: ann.yref || 'y',
+        showarrow: ann.showarrow !== false,
+        arrowhead: ann.arrowhead !== undefined ? ann.arrowhead : 2,
+        ax: ann.ax !== undefined ? ann.ax : 0,
+        ay: ann.ay !== undefined ? ann.ay : -40,
+        font: {
+          size: annFont.size,
+          family: annFont.family,
+          color: annFont.color || textColor,
+          // @ts-ignore - Plotly types don't include weight but it's valid
+          weight: annFont.weight,
+        },
+        bgcolor: ann.bgcolor,
+        bordercolor: ann.bordercolor,
+      }
+    })
   }
 
   return baseLayout

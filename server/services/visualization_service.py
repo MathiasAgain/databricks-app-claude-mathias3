@@ -195,13 +195,59 @@ Generate a JSON visualization specification that best represents this data. Cons
 
 Return ONLY a JSON object with this structure:
 {{
-  "chartType": "bar|line|scatter|pie|table",
+  "chartType": "bar|line|scatter|pie|table|heatmap|histogram|box|3d-scatter|area|bubble",
   "title": "Descriptive chart title",
-  "xAxis": {{"column": "column_name", "label": "X Label", "type": "category|linear|time"}},
-  "yAxis": {{"column": "column_name", "label": "Y Label", "type": "linear|log"}},
+  "xAxis": {{
+    "column": "column_name",
+    "label": "X Label",
+    "type": "category|linear|time|log",
+    "range": [min, max],  // Optional: fix axis range
+    "tickFormat": ".2f",  // Optional: d3-format string like ".2f", "$,.0f"
+    "showGrid": true,     // Optional: show grid lines
+    "font": {{            // Optional: axis label styling
+      "size": 12,
+      "family": "Arial",
+      "color": "#333",
+      "weight": "normal|bold"
+    }}
+  }},
+  "yAxis": {{
+    "column": "column_name",
+    "label": "Y Label",
+    "type": "linear|log",
+    "range": [min, max],
+    "tickFormat": "$,.0f",
+    "showGrid": true,
+    "font": {{"size": 12, "color": "#333"}}
+  }},
+  "zAxis": {{"column": "column_name", "label": "Z Label"}},  // For 3D charts only
   "groupBy": "optional column for grouping/series",
   "aggregation": "sum|avg|count|min|max if needed",
-  "colors": ["#3b82f6"] (optional, use brand colors),
+  "colors": ["#3b82f6", "#10b981"],  // Optional: color palette
+  "annotations": [  // Optional: add labels, markers, arrows
+    {{
+      "text": "Peak sales",
+      "x": "2024-01",
+      "y": 1000,
+      "xref": "x",      // "x" for data coords, "paper" for relative (0-1)
+      "yref": "y",
+      "font": {{"size": 14, "color": "#ef4444", "weight": "bold"}},
+      "showarrow": true,
+      "arrowhead": 2,   // Arrow style 0-8
+      "ax": 0,          // Arrow x offset
+      "ay": -40,        // Arrow y offset
+      "bgcolor": "rgba(255,255,255,0.8)",
+      "bordercolor": "#ef4444"
+    }}
+  ],
+  "layout": {{  // Optional: chart layout customization
+    "width": 800,
+    "height": 600,
+    "showlegend": true,
+    "legendPosition": "top-right|bottom|left",
+    "margin": {{"l": 60, "r": 40, "t": 60, "b": 60}},
+    "titleFont": {{"size": 18, "family": "Arial", "color": "#111", "weight": "bold"}}
+  }},
   "reasoning": "Brief explanation of why this chart type"
 }}
 
@@ -234,17 +280,45 @@ Return ONLY the JSON, no other text."""
 
 **Your Task:**
 Modify the visualization specification according to the user's request. Common modifications:
-- **Color changes**: "make it blue" → Update colors array
-- **Chart type**: "show as pie chart" → Change chartType
-- **Annotations**: "add label at peak" → Add annotations array
-- **Title**: "change title to X" → Update title
 
-**Color Guidelines:**
-- "blue" → ["#3b82f6"]
-- "red" → ["#ef4444"]
-- "green" → ["#10b981"]
-- "red and green" → ["#ef4444", "#10b981"]
-- "traffic light" → ["#ef4444", "#f59e0b", "#10b981"]
+**Color Changes:**
+- "make it blue" → Update colors: ["#3b82f6"]
+- "make the bars yellow" → Update colors: ["#eab308"]
+- "red and green bars" → Update colors: ["#ef4444", "#10b981"]
+- "traffic light colors" → Update colors: ["#ef4444", "#f59e0b", "#10b981"]
+
+**Color Palette:**
+- blue: #3b82f6, red: #ef4444, green: #10b981, yellow: #eab308
+- orange: #f97316, purple: #a855f7, pink: #ec4899, cyan: #06b6d4
+
+**Chart Type Changes:**
+- "show as pie chart" → Change chartType to "pie"
+- "convert to line chart" → Change chartType to "line"
+- "make it a bar chart" → Change chartType to "bar"
+
+**Font Customization:**
+- "make the title bigger" → Update layout.titleFont.size (e.g., 24)
+- "bold axis labels" → Update xAxis.font.weight to "bold"
+- "increase font size" → Update relevant font.size values
+- "change to Arial" → Update font.family to "Arial"
+
+**Annotation Changes:**
+- "add label at peak" → Add to annotations array with text, x, y coordinates
+- "label the highest bar" → Add annotation with showarrow: true, pointing to max value
+- "add annotation with bigger font" → Include font: {{"size": 16, "weight": "bold"}}
+- "highlight this point" → Add annotation with bgcolor and bordercolor
+
+**Layout Changes:**
+- "make it wider" → Update layout.width (e.g., 1000)
+- "increase chart height" → Update layout.height (e.g., 500)
+- "hide the legend" → Set layout.showlegend to false
+- "move legend to bottom" → Set layout.legendPosition to "bottom"
+
+**Axis Customization:**
+- "set Y-axis range to 0-100" → Update yAxis.range: [0, 100]
+- "format as currency" → Update tickFormat: "$,.0f"
+- "hide grid lines" → Set showGrid to false
+- "log scale on Y" → Set yAxis.type to "log"
 
 Return ONLY a JSON object with the complete modified specification (same structure as current). No other text."""
 
@@ -297,11 +371,29 @@ Return ONLY a JSON object with the complete modified specification (same structu
             True if message is about visualization
         """
         viz_keywords = [
+            # Chart types
             "chart", "graph", "plot", "visualize", "visualization",
+            "pie", "bar", "line", "scatter", "heatmap", "histogram", "bubble",
+
+            # Colors
             "color", "colour", "blue", "red", "green", "yellow", "orange", "purple",
             "black", "white", "pink", "cyan", "magenta", "gray", "grey", "brown",
-            "pie", "bar", "line", "scatter", "make it", "show as", "change to", "convert",
-            "annotation", "label", "title", "axis"
+
+            # Actions
+            "make it", "show as", "change to", "convert", "modify", "update",
+
+            # Font customization
+            "font", "size", "bigger", "smaller", "bold", "arial", "courier",
+            "increase", "decrease", "larger", "family",
+
+            # Annotations
+            "annotation", "label", "marker", "arrow", "highlight", "point to",
+
+            # Layout
+            "width", "height", "wider", "taller", "legend", "margin",
+
+            # Axis
+            "axis", "range", "scale", "grid", "tick", "format"
         ]
 
         message_lower = message.lower()
