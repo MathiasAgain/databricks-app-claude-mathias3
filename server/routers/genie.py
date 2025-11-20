@@ -268,18 +268,52 @@ async def chat_with_claude(
             current_viz_spec=current_viz_spec  # Enables modify_visualization tool
         )
 
-        # Build response - visualization_spec will be present if Claude called the tool
+        # FALLBACK: If tool calling isn't supported by Databricks endpoint,
+        # detect visualization requests using keywords and call viz service directly
+        updated_viz_spec = response.get("visualization_spec")
+
+        if not updated_viz_spec and current_viz_spec and query_results:
+            # Check if this is a visualization modification request using keyword detection
+            from server.services.visualization_service import VisualizationService
+            from server.models import QueryResults, VisualizationSpec
+
+            if VisualizationService.is_visualization_request(request.message):
+                logger.info("Detected visualization request (fallback mode) - calling viz service directly")
+
+                # Convert dict to QueryResults object
+                results_obj = QueryResults(
+                    columns=query_results["columns"],
+                    rows=query_results["rows"],
+                    rowCount=query_results["rowCount"]
+                )
+
+                # Call visualization service directly
+                viz_service = get_visualization_service()
+                updated_viz_spec = await viz_service.modify_visualization(
+                    current_spec=VisualizationSpec(**current_viz_spec.model_dump() if hasattr(current_viz_spec, 'model_dump') else current_viz_spec),
+                    results=results_obj,
+                    modification_request=request.message
+                )
+
+                if updated_viz_spec:
+                    logger.info(f"Fallback viz modification successful: {updated_viz_spec.chartType}")
+                    # Convert to dict for response
+                    updated_viz_spec = updated_viz_spec.model_dump(by_alias=True)
+                else:
+                    logger.warning("Fallback viz modification failed")
+
+        # Build response - visualization_spec will be present if Claude called the tool OR fallback succeeded
         chat_response = ChatResponse(
             message=response["message"],
             suggested_followups=response.get("suggested_followups", []),
             confidence=1.0,
-            visualizationSpec=response.get("visualization_spec")  # Updated viz if tool was called
+            visualizationSpec=updated_viz_spec  # Updated viz from tool call or fallback
         )
 
-        if response.get("visualization_spec"):
-            logger.info("Claude called modify_visualization tool - returning updated chart")
+        if updated_viz_spec:
+            logger.info("Returning updated visualization (tool call or fallback)")
         else:
-            logger.info("Claude provided analytical response")
+            logger.info("Claude provided analytical response only")
 
         return chat_response
 
