@@ -84,7 +84,10 @@
       "Bash(./fix.sh)",
       "Bash(bun run prettier:*)",
       "Bash(git rm:*)",
-      "Bash(databricks workspace export:*)"
+      "Bash(databricks workspace export:*)",
+      "Bash(git fetch:*)",
+      "Bash(git show:*)",
+      "Bash(git rev-list:*)"
     ],
     "deny": [],
     "ask": []

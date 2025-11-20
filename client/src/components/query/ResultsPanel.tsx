@@ -168,6 +168,7 @@ export function ResultsPanel({ result, onFollowupClick, onNewQuery, isProcessing
       {/* Chat Interface */}
       <ChatInterface
         queryResults={result.results}
+        visualizationSpec={result.visualizationSpec}
         onSendMessage={onFollowupClick}
         onNewQuery={onNewQuery}
         isProcessing={isProcessing}

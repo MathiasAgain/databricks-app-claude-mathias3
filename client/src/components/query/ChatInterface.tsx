@@ -14,12 +14,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import type { QueryResults } from '@/types/genie'
+import type { QueryResults, VisualizationSpec } from '@/types/genie'
 
 type MessageMode = 'chat' | 'query'
 
 interface ChatInterfaceProps {
   queryResults: QueryResults
+  visualizationSpec?: VisualizationSpec
   onSendMessage?: (message: string) => void
   onNewQuery?: (question: string) => void
   isProcessing?: boolean
@@ -27,6 +28,7 @@ interface ChatInterfaceProps {
 
 export function ChatInterface({
   queryResults,
+  visualizationSpec,
   onSendMessage,
   onNewQuery,
   isProcessing,

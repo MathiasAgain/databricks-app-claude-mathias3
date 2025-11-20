@@ -254,6 +254,10 @@ async def chat_with_claude(
         # Extract current visualization spec from context (separate field)
         current_viz_spec = request.context.current_visualization_spec
 
+        # DEBUG: Log what we received
+        logger.info(f"[DEBUG] context.current_visualization_spec={current_viz_spec}")
+        logger.info(f"[DEBUG] context.current_query_results={'present' if request.context.current_query_results else 'None'}")
+
         # Call Claude with tool calling support - it will decide routing intelligently
         logger.info(f"Calling Claude Sonnet with tool calling {'enabled' if current_viz_spec else 'disabled'}")
 

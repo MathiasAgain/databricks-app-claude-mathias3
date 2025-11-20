@@ -55,16 +55,13 @@ class VisualizationService:
             prompt = self._build_generation_prompt(results, user_question, analysis_context)
 
             # Call Claude Haiku with timeout
-            async def call_claude():
-                """Wrapper to make SDK call awaitable."""
-                return self.client.messages.create(
+            response = await asyncio.wait_for(
+                asyncio.to_thread(
+                    self.client.messages.create,
                     model=self.model,
                     max_tokens=2000,
                     messages=[{"role": "user", "content": prompt}]
-                )
-
-            response = await asyncio.wait_for(
-                asyncio.to_thread(call_claude),
+                ),
                 timeout=VIZ_GENERATION_TIMEOUT
             )
 
@@ -110,16 +107,13 @@ class VisualizationService:
             prompt = self._build_modification_prompt(current_spec, results, modification_request)
 
             # Call Claude Haiku with timeout
-            async def call_claude():
-                """Wrapper to make SDK call awaitable."""
-                return self.client.messages.create(
+            response = await asyncio.wait_for(
+                asyncio.to_thread(
+                    self.client.messages.create,
                     model=self.model,
                     max_tokens=2000,
                     messages=[{"role": "user", "content": prompt}]
-                )
-
-            response = await asyncio.wait_for(
-                asyncio.to_thread(call_claude),
+                ),
                 timeout=VIZ_GENERATION_TIMEOUT
             )
 
