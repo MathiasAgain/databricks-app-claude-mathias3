@@ -227,7 +227,7 @@ Return ONLY the JSON, no other text."""
 ```
 
 **Data Available:**
-- Columns: {', '.join([col.name for col in results.columns])}
+- Columns: {', '.join(results.columns)}
 - Row count: {results.rowCount}
 
 **User Modification Request:** "{modification_request}"
