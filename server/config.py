@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     claude_endpoint: str
     dashboard_id: str
 
+    # Anthropic Configuration (for visualization agent)
+    anthropic_api_key: Optional[str] = None
+
     # Query Settings
     query_cache_ttl: int = 300  # 5 minutes
     query_timeout: int = 30  # 30 seconds

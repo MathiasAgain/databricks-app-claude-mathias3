@@ -28,7 +28,7 @@ class VisualizationService:
 
     def __init__(self):
         """Initialize the visualization service with Claude Haiku."""
-        self.client = Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+        self.client = Anthropic(api_key=settings.anthropic_api_key)
         self.model = "claude-3-5-haiku-20241022"  # Fast and cheap for focused tasks
 
     async def generate_visualization(
