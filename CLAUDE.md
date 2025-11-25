@@ -18,6 +18,65 @@ This is a modern full-stack application template for Databricks Apps, featuring 
 - shadcn/ui components with Tailwind CSS
 - React Query for API state management
 - Bun for package management
+- Zustand for state management with localStorage persistence
+- Plotly.js for interactive visualizations
+
+## Application Features
+
+### Three Main Tabs
+
+1. **Analytics** - Main query interface with Genie AI and Claude insights
+2. **Chart Gallery** - Browse saved templates and recent charts
+3. **Export** - Export data and visualizations
+
+### Two-Mode Chat Interface
+
+The Analytics page features a unified chat interface with two modes:
+
+**Analytics Mode:**
+
+- Ask questions about data
+- Get AI-powered insights from Claude
+- Request new Genie queries
+- Follow-up questions with conversation context
+
+**Edit Chart Mode:**
+
+- Modify chart appearance with natural language
+- Quick action chips for common modifications (colors, chart types, styling)
+- Full context awareness (data + visualization)
+- Real-time chart updates
+
+### Chart History & Undo/Redo
+
+- Track up to 10 visualization states per query
+- Undo/redo chart modifications
+- Reset to original chart
+- Version indicator (e.g., "Version 3 of 5")
+- Persists to localStorage
+
+### Save Templates & Export
+
+- Save chart configurations as reusable templates (max 20)
+- Export charts as PNG, SVG, or JSON
+- Apply saved templates to current data
+- Thumbnail previews for templates
+
+### Chart Gallery Page
+
+- View current active chart
+- Browse saved templates with apply/delete actions
+- Recent charts grid with click-to-load
+- Empty states with helpful guidance
+
+### Key Frontend Files
+
+- `client/src/pages/AnalyticsPage.tsx` - Main query and chat interface
+- `client/src/pages/VisualizationPage.tsx` - Chart Gallery page
+- `client/src/components/query/ChatInterface.tsx` - Two-mode chat component
+- `client/src/components/charts/PlotlyChart.tsx` - Interactive chart with export
+- `client/src/stores/chartHistoryStore.ts` - Chart history and templates state
+- `client/src/stores/queryStore.ts` - Query and conversation state
 
 ## Development Workflow
 

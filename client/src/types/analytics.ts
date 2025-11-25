@@ -24,13 +24,6 @@ export interface ChatMessage {
   queryResults?: QueryResult
 }
 
-export interface DashboardConfig {
-  dashboardUrl: string
-  dashboardId: string
-  embedToken?: string
-  expiresAt?: Date
-}
-
 export interface AppState {
   // Query state
   currentQuery?: QueryResult
@@ -39,9 +32,6 @@ export interface AppState {
   // Chat state
   messages: ChatMessage[]
   isTyping: boolean
-
-  // Dashboard state
-  dashboardConfig?: DashboardConfig
 
   // UI state
   sidebarExpanded: boolean

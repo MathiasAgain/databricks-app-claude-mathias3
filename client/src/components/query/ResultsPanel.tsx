@@ -17,11 +17,38 @@ import type { AskQuestionResponse } from '@/types/genie'
 interface ResultsPanelProps {
   result: AskQuestionResponse
   onFollowupClick?: (question: string) => void
+  onEditChart?: (request: string) => void
   onNewQuery?: (question: string) => void
   isProcessing?: boolean
+  isModifyingChart?: boolean
+  // Chart history props
+  onUndo?: () => void
+  onRedo?: () => void
+  onResetChart?: () => void
+  canUndo?: boolean
+  canRedo?: boolean
+  historyIndex?: number
+  historyTotal?: number
+  // Template props
+  onSaveTemplate?: (spec: import('@/types/genie').VisualizationSpec, thumbnail?: string) => void
 }
 
-export function ResultsPanel({ result, onFollowupClick, onNewQuery, isProcessing }: ResultsPanelProps) {
+export function ResultsPanel({
+  result,
+  onFollowupClick,
+  onEditChart,
+  onNewQuery,
+  isProcessing,
+  isModifyingChart,
+  onUndo,
+  onRedo,
+  onResetChart,
+  canUndo = false,
+  canRedo = false,
+  historyIndex = 0,
+  historyTotal = 0,
+  onSaveTemplate,
+}: ResultsPanelProps) {
   const [showChart, setShowChart] = useState(true)
 
   return (
@@ -137,27 +164,90 @@ export function ResultsPanel({ result, onFollowupClick, onNewQuery, isProcessing
               </div>
               <span className="text-accent">Data Visualization</span>
             </CardTitle>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowChart(!showChart)}
-              className="hover:bg-accent/10"
-            >
-              {showChart ? (
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                </svg>
-              ) : (
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
+
+            {/* Undo/Redo Controls */}
+            <div className="flex items-center gap-2">
+              {historyTotal > 1 && (
+                <>
+                  {/* Version indicator */}
+                  <Badge variant="outline" className="text-xs px-2 py-1 border-accent/30">
+                    Version {historyIndex} of {historyTotal}
+                  </Badge>
+
+                  {/* Undo button */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={onUndo}
+                    disabled={!canUndo || isModifyingChart}
+                    className="hover:bg-accent/10 h-8 w-8 p-0"
+                    title="Undo chart change"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                    </svg>
+                  </Button>
+
+                  {/* Redo button */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={onRedo}
+                    disabled={!canRedo || isModifyingChart}
+                    className="hover:bg-accent/10 h-8 w-8 p-0"
+                    title="Redo chart change"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6" />
+                    </svg>
+                  </Button>
+
+                  {/* Reset to original */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={onResetChart}
+                    disabled={historyIndex === 1 || isModifyingChart}
+                    className="hover:bg-accent/10 h-8 px-2"
+                    title="Reset to original chart"
+                  >
+                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    <span className="text-xs">Reset</span>
+                  </Button>
+
+                  <div className="w-px h-6 bg-border mx-1" />
+                </>
               )}
-            </Button>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowChart(!showChart)}
+                className="hover:bg-accent/10"
+              >
+                {showChart ? (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                )}
+              </Button>
+            </div>
           </div>
         </CardHeader>
         {showChart && (
           <CardContent className="pt-6">
-            <PlotlyChart results={result.results} visualizationSpec={result.visualizationSpec} />
+            <PlotlyChart
+              results={result.results}
+              visualizationSpec={result.visualizationSpec}
+              isModifying={isModifyingChart}
+              onSaveTemplate={onSaveTemplate}
+            />
           </CardContent>
         )}
       </Card>
@@ -170,8 +260,10 @@ export function ResultsPanel({ result, onFollowupClick, onNewQuery, isProcessing
         queryResults={result.results}
         visualizationSpec={result.visualizationSpec}
         onSendMessage={onFollowupClick}
+        onEditChart={onEditChart}
         onNewQuery={onNewQuery}
         isProcessing={isProcessing}
+        isModifyingChart={isModifyingChart}
       />
     </div>
   )

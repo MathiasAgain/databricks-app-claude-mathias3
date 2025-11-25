@@ -2,11 +2,13 @@
  * Chat Interface Component
  *
  * Enables multi-turn conversations with Claude about query results
- * AND new data queries with Genie - all in one unified interface.
+ * AND chart editing - all in one unified interface with shared context.
  *
  * Two modes:
- * - Chat Mode: Ask Claude follow-up questions, request viz changes
- * - Query Mode: Ask Genie new data questions
+ * - Analytics Mode: Ask Claude questions, get insights, new Genie queries
+ * - Edit Chart Mode: Modify chart appearance (colors, type, labels, etc.)
+ *
+ * Both modes share full context (data + visualization) for intelligent responses.
  */
 
 import { useState } from 'react'
@@ -16,37 +18,74 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import type { QueryResults, VisualizationSpec } from '@/types/genie'
 
-type MessageMode = 'chat' | 'query'
+type MessageMode = 'analytics' | 'edit-chart'
 
 interface ChatInterfaceProps {
   queryResults: QueryResults
   visualizationSpec?: VisualizationSpec
   onSendMessage?: (message: string) => void
+  onEditChart?: (request: string) => void
   onNewQuery?: (question: string) => void
   isProcessing?: boolean
+  isModifyingChart?: boolean
+}
+
+// Quick action chips for Edit Chart mode
+const quickActions = {
+  colors: [
+    { label: 'Blue', prompt: 'Change the chart colors to blue' },
+    { label: 'Red', prompt: 'Change the chart colors to red' },
+    { label: 'Green', prompt: 'Change the chart colors to green' },
+    { label: 'Orange', prompt: 'Change the chart colors to orange' },
+    { label: 'Purple', prompt: 'Change the chart colors to purple' },
+  ],
+  chartTypes: [
+    { label: 'Bar', prompt: 'Convert to a bar chart' },
+    { label: 'Line', prompt: 'Convert to a line chart' },
+    { label: 'Pie', prompt: 'Convert to a pie chart' },
+    { label: 'Area', prompt: 'Convert to an area chart' },
+    { label: 'Scatter', prompt: 'Convert to a scatter plot' },
+  ],
+  styling: [
+    { label: 'Add Labels', prompt: 'Add data labels to the chart' },
+    { label: 'Hide Legend', prompt: 'Hide the legend' },
+    { label: 'Show Grid', prompt: 'Show grid lines' },
+    { label: 'Add Title', prompt: 'Add a descriptive title' },
+  ],
 }
 
 export function ChatInterface({
   queryResults,
   visualizationSpec,
   onSendMessage,
+  onEditChart,
   onNewQuery,
   isProcessing,
+  isModifyingChart,
 }: ChatInterfaceProps) {
   const [inputMessage, setInputMessage] = useState('')
-  const [mode, setMode] = useState<MessageMode>('chat')
+  const [mode, setMode] = useState<MessageMode>('analytics')
+
+  const isLoading = isProcessing || isModifyingChart
 
   const handleSendMessage = () => {
-    if (!inputMessage.trim() || isProcessing) return
+    if (!inputMessage.trim() || isLoading) return
 
     // Route based on mode
-    if (mode === 'chat') {
+    if (mode === 'analytics') {
+      // Analytics mode handles both follow-ups and new queries intelligently
       onSendMessage?.(inputMessage)
     } else {
-      onNewQuery?.(inputMessage)
+      // Edit chart mode
+      onEditChart?.(inputMessage)
     }
 
     setInputMessage('')
+  }
+
+  const handleQuickAction = (prompt: string) => {
+    if (isLoading) return
+    onEditChart?.(prompt)
   }
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -58,34 +97,16 @@ export function ChatInterface({
 
   // Mode-specific UI content
   const modeConfig = {
-    chat: {
-      title: 'Ask Follow-up Questions',
-      badge: 'AI Assistant',
-      placeholder: 'Type your question or visualization request...',
+    analytics: {
+      title: 'Analytics & Questions',
+      badge: 'Claude + Genie',
+      badgeColor: 'bg-primary',
+      placeholder: 'Ask about the data, request insights, or ask a new question...',
       examples: [
-        '"Make it blue" - Change chart colors',
-        '"Show as pie chart" - Change chart type',
-        '"Add labels to the highest points" - Add annotations',
-        '"What\'s the trend?" - Ask analytical questions',
-      ],
-      icon: (
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-        />
-      ),
-    },
-    query: {
-      title: 'Ask New Data Query',
-      badge: 'Genie',
-      placeholder: 'Ask a new question about your data...',
-      examples: [
-        '"Show top 10 products by sales" - New data query',
-        '"What were sales last quarter?" - Time-based query',
-        '"Compare sales by region" - Comparison query',
-        '"Show revenue trend for 2024" - Trend analysis',
+        '"What\'s the main trend here?" - Analytical insight',
+        '"Which product performs best?" - Data question',
+        '"Explain these anomalies" - Pattern analysis',
+        '"Show me top 10 by revenue" - New Genie query',
       ],
       icon: (
         <path
@@ -93,6 +114,26 @@ export function ChatInterface({
           strokeLinejoin="round"
           strokeWidth={2}
           d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+        />
+      ),
+    },
+    'edit-chart': {
+      title: 'Edit Chart',
+      badge: 'Visual Editor',
+      badgeColor: 'bg-accent',
+      placeholder: 'Describe how to change the chart appearance...',
+      examples: [
+        '"Make it blue" - Change colors',
+        '"Show as pie chart" - Change type',
+        '"Add labels to highest values" - Annotations',
+        '"Make the title bigger" - Styling',
+      ],
+      icon: (
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"
         />
       ),
     },
@@ -105,7 +146,7 @@ export function ChatInterface({
       <CardHeader className="border-b border-accent/10 bg-accent/5">
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg flex items-center gap-3">
-            <div className="p-2 bg-accent rounded-lg">
+            <div className={`p-2 rounded-lg ${mode === 'analytics' ? 'bg-primary' : 'bg-accent'}`}>
               <svg
                 className="w-5 h-5 text-white"
                 fill="none"
@@ -115,39 +156,18 @@ export function ChatInterface({
                 {config.icon}
               </svg>
             </div>
-            <span className="text-accent">{config.title}</span>
-            <Badge variant="secondary" className="ml-2">
+            <span className={mode === 'analytics' ? 'text-primary' : 'text-accent'}>{config.title}</span>
+            <Badge variant="secondary" className={`ml-2 ${config.badgeColor} text-white`}>
               {config.badge}
             </Badge>
           </CardTitle>
 
-          {/* Mode Toggle */}
-          <div className="flex gap-2 bg-background/80 rounded-lg p-1 border border-muted">
+          {/* Mode Toggle - Two modes: Analytics & Edit Chart */}
+          <div className="flex gap-1 bg-background/80 rounded-lg p-1 border border-muted">
             <Button
-              variant={mode === 'chat' ? 'default' : 'ghost'}
+              variant={mode === 'analytics' ? 'default' : 'ghost'}
               size="sm"
-              onClick={() => setMode('chat')}
-              className="text-xs"
-            >
-              <svg
-                className="w-3 h-3 mr-1"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-                />
-              </svg>
-              Chat
-            </Button>
-            <Button
-              variant={mode === 'query' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setMode('query')}
+              onClick={() => setMode('analytics')}
               className="text-xs"
             >
               <svg
@@ -163,7 +183,30 @@ export function ChatInterface({
                   d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
                 />
               </svg>
-              New Query
+              Analytics
+            </Button>
+            <Button
+              variant={mode === 'edit-chart' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setMode('edit-chart')}
+              className="text-xs"
+              disabled={!visualizationSpec}
+              title={!visualizationSpec ? 'No chart to edit - run a query first' : 'Edit chart appearance'}
+            >
+              <svg
+                className="w-3 h-3 mr-1"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"
+                />
+              </svg>
+              Edit Chart
             </Button>
           </div>
         </div>
@@ -171,9 +214,73 @@ export function ChatInterface({
       <CardContent className="pt-6">
         {/* Input Area */}
         <div className="space-y-4">
+          {/* Quick Actions for Edit Chart Mode */}
+          {mode === 'edit-chart' && visualizationSpec && (
+            <div className="space-y-3 p-4 bg-accent/5 rounded-lg border border-accent/20">
+              <p className="text-sm font-medium text-accent flex items-center gap-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                Quick Actions
+              </p>
+
+              {/* Colors */}
+              <div className="flex flex-wrap gap-2">
+                <span className="text-xs text-muted-foreground w-16">Colors:</span>
+                {quickActions.colors.map((action) => (
+                  <Button
+                    key={action.label}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleQuickAction(action.prompt)}
+                    disabled={isLoading}
+                    className="text-xs h-7 px-2 hover:bg-accent/10 hover:border-accent"
+                  >
+                    {action.label}
+                  </Button>
+                ))}
+              </div>
+
+              {/* Chart Types */}
+              <div className="flex flex-wrap gap-2">
+                <span className="text-xs text-muted-foreground w-16">Type:</span>
+                {quickActions.chartTypes.map((action) => (
+                  <Button
+                    key={action.label}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleQuickAction(action.prompt)}
+                    disabled={isLoading}
+                    className="text-xs h-7 px-2 hover:bg-accent/10 hover:border-accent"
+                  >
+                    {action.label}
+                  </Button>
+                ))}
+              </div>
+
+              {/* Styling */}
+              <div className="flex flex-wrap gap-2">
+                <span className="text-xs text-muted-foreground w-16">Style:</span>
+                {quickActions.styling.map((action) => (
+                  <Button
+                    key={action.label}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleQuickAction(action.prompt)}
+                    disabled={isLoading}
+                    className="text-xs h-7 px-2 hover:bg-accent/10 hover:border-accent"
+                  >
+                    {action.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Examples */}
           <div className="p-4 bg-background/80 rounded-lg border border-muted">
             <p className="text-sm text-muted-foreground mb-3">
-              💡 <strong>Try asking:</strong>
+              {mode === 'edit-chart' ? '🎨' : '💡'} <strong>Try asking:</strong>
             </p>
             <ul className="text-sm text-muted-foreground space-y-1 ml-4">
               {config.examples.map((example, index) => (
@@ -189,15 +296,15 @@ export function ChatInterface({
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyPress={handleKeyPress}
-              disabled={isProcessing}
+              disabled={isLoading}
               className="flex-1"
             />
             <Button
               onClick={handleSendMessage}
-              disabled={!inputMessage.trim() || isProcessing}
-              className="px-6"
+              disabled={!inputMessage.trim() || isLoading}
+              className={`px-6 ${mode === 'edit-chart' ? 'bg-accent hover:bg-accent/90' : ''}`}
             >
-              {isProcessing ? (
+              {isLoading ? (
                 <svg
                   className="w-4 h-4 animate-spin"
                   fill="none"
@@ -232,9 +339,9 @@ export function ChatInterface({
           {/* Helper Text */}
           <p className="text-xs text-muted-foreground text-center">
             Press Enter to send •{' '}
-            {mode === 'chat'
-              ? 'Visualization updates appear in the AI Insights section above'
-              : 'New query results will replace current data'}
+            {mode === 'analytics'
+              ? 'Ask questions about the data or request new queries'
+              : 'Chart updates will appear above'}
           </p>
         </div>
       </CardContent>

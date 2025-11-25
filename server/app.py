@@ -12,7 +12,6 @@ from fastapi.responses import ORJSONResponse
 
 from server.routers import router
 from server.routers.genie import router as genie_router
-from server.routers.dashboard import router as dashboard_router
 from server.routers.test_claude import router as test_claude_router
 from server.routers.tools import router as tools_router
 
@@ -67,7 +66,6 @@ app.add_middleware(
 
 app.include_router(router, prefix='/api', tags=['api'])
 app.include_router(genie_router)
-app.include_router(dashboard_router)
 app.include_router(test_claude_router)
 app.include_router(tools_router)
 

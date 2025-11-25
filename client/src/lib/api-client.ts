@@ -9,7 +9,6 @@ import type {
   AskQuestionResponse,
   SuggestedQuestion,
 } from '@/types/genie'
-import type { DashboardConfig } from '@/types/analytics'
 import type { ChatRequest, ChatResponse } from '@/types/claude'
 
 const API_BASE_URL = '/api'
@@ -64,20 +63,6 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify(request),
     })
-  }
-
-  // Dashboard API methods
-  async getDashboardConfig(): Promise<DashboardConfig> {
-    return this.request<DashboardConfig>('/dashboard/config')
-  }
-
-  async refreshDashboardToken(): Promise<{ token: string; expiresAt: Date }> {
-    return this.request<{ token: string; expiresAt: Date }>(
-      '/dashboard/refresh-token',
-      {
-        method: 'POST',
-      }
-    )
   }
 }
 

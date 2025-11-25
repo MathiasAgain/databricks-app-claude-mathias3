@@ -1,16 +1,22 @@
 /**
  * Analytics Page - Main application page
  *
- * Combines dashboard, query input, and results in a unified interface.
+ * Combines query input, results, and chat interface in a unified experience.
  * This is the primary page for the Nielsen Sales Analytics Assistant.
+ *
+ * Features:
+ * - Ask questions via Genie AI
+ * - Get AI-powered insights from Claude
+ * - Edit charts with natural language
  */
 
-import { useCallback } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { QueryInput } from "@/components/query/QueryInput";
 import { SuggestedQuestions } from "@/components/query/SuggestedQuestions";
 import { ResultsPanel } from "@/components/query/ResultsPanel";
 import { useAskQuestion, useChatWithClaude } from "@/hooks/useGenie";
 import { useQueryStore } from "@/stores/queryStore";
+import { useChartHistoryStore } from "@/stores/chartHistoryStore";
 import type { AskQuestionResponse } from "@/types/genie";
 import type { ChatRequest } from "@/types/claude";
 
@@ -18,6 +24,21 @@ export default function AnalyticsPage() {
   const { mutate: askQuestion } = useAskQuestion();
   const { mutate: chatWithClaude, isPending: isChatPending } =
     useChatWithClaude();
+
+  // State for chart modification
+  const [isModifyingChart, setIsModifyingChart] = useState(false);
+
+  // Chart history store for undo/redo
+  const initializeHistory = useChartHistoryStore((state) => state.initializeHistory);
+  const addSnapshot = useChartHistoryStore((state) => state.addSnapshot);
+  const undo = useChartHistoryStore((state) => state.undo);
+  const redo = useChartHistoryStore((state) => state.redo);
+  const canUndo = useChartHistoryStore((state) => state.canUndo);
+  const canRedo = useChartHistoryStore((state) => state.canRedo);
+  const getCurrentIndex = useChartHistoryStore((state) => state.getCurrentIndex);
+  const getTotalSnapshots = useChartHistoryStore((state) => state.getTotalSnapshots);
+  const resetToOriginal = useChartHistoryStore((state) => state.resetToOriginal);
+  const saveTemplate = useChartHistoryStore((state) => state.saveTemplate);
 
   // Use store directly - no local state needed
   const currentQuery = useQueryStore((state) => state.currentQuery);
@@ -32,6 +53,63 @@ export default function AnalyticsPage() {
     (state) => state.clearConversationHistory,
   );
   const addToHistory = useQueryStore((state) => state.addToHistory);
+
+  // Initialize chart history when a new query completes
+  useEffect(() => {
+    if (currentQuery?.queryId && currentQuery?.visualizationSpec) {
+      initializeHistory(currentQuery.queryId, currentQuery.visualizationSpec);
+    }
+  }, [currentQuery?.queryId, currentQuery?.visualizationSpec, initializeHistory]);
+
+  // Undo/Redo handlers
+  const handleUndo = useCallback(() => {
+    if (!currentQuery?.queryId) return;
+    const spec = undo(currentQuery.queryId);
+    if (spec) {
+      setCurrentQuery({
+        ...currentQuery,
+        visualizationSpec: spec,
+      });
+    }
+  }, [currentQuery, undo, setCurrentQuery]);
+
+  const handleRedo = useCallback(() => {
+    if (!currentQuery?.queryId) return;
+    const spec = redo(currentQuery.queryId);
+    if (spec) {
+      setCurrentQuery({
+        ...currentQuery,
+        visualizationSpec: spec,
+      });
+    }
+  }, [currentQuery, redo, setCurrentQuery]);
+
+  const handleResetChart = useCallback(() => {
+    if (!currentQuery?.queryId) return;
+    const spec = resetToOriginal(currentQuery.queryId);
+    if (spec) {
+      setCurrentQuery({
+        ...currentQuery,
+        visualizationSpec: spec,
+      });
+    }
+  }, [currentQuery, resetToOriginal, setCurrentQuery]);
+
+  // Handle saving chart as template
+  const handleSaveTemplate = useCallback(
+    (spec: import("@/types/genie").VisualizationSpec, thumbnail?: string) => {
+      const chartType = spec.chartType || "chart";
+      const timestamp = new Date().toLocaleString();
+      saveTemplate(
+        `${chartType} - ${timestamp}`,
+        `Saved from query: ${currentQuery?.question || "Unknown"}`,
+        spec,
+        thumbnail,
+      );
+      // Could add a toast notification here
+    },
+    [currentQuery?.question, saveTemplate],
+  );
 
   const handleQueryComplete = useCallback(
     (result: AskQuestionResponse) => {
@@ -111,6 +189,65 @@ export default function AnalyticsPage() {
     [askQuestion, handleQueryComplete],
   );
 
+  /**
+   * Handle chart editing requests
+   * Uses Claude chat with visualization context to modify the chart
+   */
+  const handleEditChart = useCallback(
+    (request: string) => {
+      if (!currentQuery) return;
+
+      setIsModifyingChart(true);
+
+      const chatRequest: ChatRequest = {
+        message: `[Chart modification request] ${request}`,
+        context: {
+          conversationHistory,
+          currentQueryResults: currentQuery.results,
+          currentVisualizationSpec: currentQuery.visualizationSpec,
+        },
+      };
+
+      chatWithClaude(chatRequest, {
+        onSuccess: (chatResponse) => {
+          setIsModifyingChart(false);
+
+          // Update visualization spec if Claude modified it
+          if (chatResponse.visualizationSpec) {
+            const updatedQuery: AskQuestionResponse = {
+              ...currentQuery,
+              visualizationSpec: chatResponse.visualizationSpec,
+            };
+
+            // Add to chart history for undo/redo
+            addSnapshot(currentQuery.queryId, chatResponse.visualizationSpec, request);
+
+            // Add to conversation history
+            const newMessages = [
+              { role: "user", content: `[Chart edit] ${request}` },
+              { role: "assistant", content: "Chart updated successfully." },
+            ];
+            setConversationHistory([...conversationHistory, ...newMessages]);
+
+            // Update store
+            setCurrentQuery(updatedQuery);
+          }
+        },
+        onError: () => {
+          setIsModifyingChart(false);
+        },
+      });
+    },
+    [
+      currentQuery,
+      conversationHistory,
+      chatWithClaude,
+      setConversationHistory,
+      setCurrentQuery,
+      addSnapshot,
+    ],
+  );
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
       {/* Left Sidebar - Suggested Questions */}
@@ -149,8 +286,20 @@ export default function AnalyticsPage() {
             <ResultsPanel
               result={currentQuery}
               onFollowupClick={handleFollowupClick}
+              onEditChart={handleEditChart}
               onNewQuery={handleNewQuery}
               isProcessing={isChatPending}
+              isModifyingChart={isModifyingChart}
+              // Chart history props
+              onUndo={handleUndo}
+              onRedo={handleRedo}
+              onResetChart={handleResetChart}
+              canUndo={canUndo(currentQuery.queryId)}
+              canRedo={canRedo(currentQuery.queryId)}
+              historyIndex={getCurrentIndex(currentQuery.queryId)}
+              historyTotal={getTotalSnapshots(currentQuery.queryId)}
+              // Template props
+              onSaveTemplate={handleSaveTemplate}
             />
           </section>
         )}
