@@ -87,7 +87,8 @@
       "Bash(databricks workspace export:*)",
       "Bash(git fetch:*)",
       "Bash(git show:*)",
-      "Bash(git rev-list:*)"
+      "Bash(git rev-list:*)",
+      "Bash(bun remove:*)"
     ],
     "deny": [],
     "ask": []

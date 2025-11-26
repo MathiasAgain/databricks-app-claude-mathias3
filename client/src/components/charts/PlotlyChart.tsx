@@ -19,7 +19,7 @@
 
 import { useMemo, useRef, useState } from 'react'
 import Plot from 'react-plotly.js'
-import Plotly from 'plotly.js-dist-min'
+import Plotly from 'plotly.js-basic-dist'
 import { Button } from '@/components/ui/button'
 import type { QueryResults } from '@/types'
 import type { VisualizationSpec } from '@/stores/queryStore'
