@@ -9,6 +9,8 @@
  * - Quick action chips for common modifications
  * - Natural language text input
  * - Visual feedback during modifications
+ *
+ * @version 1.0.1 - Added to visualization card
  */
 
 import { useState } from 'react'
@@ -73,7 +75,7 @@ export function ChartEditor({ onEditChart, isModifying = false, disabled = false
   }
 
   return (
-    <div className="border-t border-accent/20 bg-gradient-to-r from-accent/5 to-transparent">
+    <div className="border-t border-accent/20 bg-gradient-to-r from-accent/5 to-transparent" data-testid="chart-editor">
       {/* Toggle Button */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
