@@ -253,12 +253,12 @@ export function ResultsPanel({
               />
             </CardContent>
 
-            {/* Chart Editor - Integrated into Visualization Card */}
-            {result.visualizationSpec && onEditChart && (
+            {/* Chart Editor - Always show when visualization exists */}
+            {result.visualizationSpec && (
               <ChartEditor
-                onEditChart={onEditChart}
+                onEditChart={onEditChart || (() => {})}
                 isModifying={isModifyingChart}
-                disabled={!result.visualizationSpec}
+                disabled={false}
               />
             )}
           </>

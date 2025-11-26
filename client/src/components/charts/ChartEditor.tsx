@@ -70,10 +70,6 @@ export function ChartEditor({ onEditChart, isModifying = false, disabled = false
     }
   }
 
-  if (disabled) {
-    return null
-  }
-
   return (
     <div className="border-t border-accent/20 bg-gradient-to-r from-accent/5 to-transparent" data-testid="chart-editor">
       {/* Toggle Button */}
