@@ -1,35 +1,35 @@
 """
 Visualization Service - Dedicated agent for chart configuration.
 
-This service uses Claude Haiku to generate optimal visualization specifications
-based on query results and user intent. Separated from analytics for better
-modularity and cost efficiency.
+This service uses the Databricks Claude endpoint to generate optimal visualization
+specifications based on query results and user intent. Uses the same endpoint as
+the main Claude service for consistency in Databricks deployments.
 """
 
 import json
 import logging
 import asyncio
 from typing import Dict, Any, Optional, List
-from anthropic import Anthropic
+from databricks.sdk import WorkspaceClient
 from server.config import settings
 from server.models.genie_models import QueryResults, VisualizationSpec
 
 logger = logging.getLogger(__name__)
 
-# Timeout for visualization generation (should be fast with Haiku)
-VIZ_GENERATION_TIMEOUT = 10  # seconds
+# Timeout for visualization generation
+VIZ_GENERATION_TIMEOUT = 15  # seconds
 
 
 class VisualizationService:
     """
     Service for generating and modifying visualization specifications.
-    Uses Claude Haiku for fast, cost-efficient chart configuration.
+    Uses the Databricks Claude endpoint for consistent deployment.
     """
 
     def __init__(self):
-        """Initialize the visualization service with Claude Haiku."""
-        self.client = Anthropic(api_key=settings.anthropic_api_key)
-        self.model = "claude-3-5-haiku-20241022"  # Fast and cheap for focused tasks
+        """Initialize the visualization service with Databricks workspace client."""
+        self.client = WorkspaceClient()
+        self.endpoint_name = "databricks-claude-sonnet-4-5"
 
     async def generate_visualization(
         self,
@@ -54,21 +54,15 @@ class VisualizationService:
             # Build the prompt for chart generation
             prompt = self._build_generation_prompt(results, user_question, analysis_context)
 
-            # Call Claude Haiku with timeout
+            # Call Databricks Claude endpoint with timeout
             response = await asyncio.wait_for(
-                asyncio.to_thread(
-                    self.client.messages.create,
-                    model=self.model,
-                    max_tokens=2000,
-                    messages=[{"role": "user", "content": prompt}]
-                ),
+                self._call_claude(prompt),
                 timeout=VIZ_GENERATION_TIMEOUT
             )
 
-            # Extract text from response content
-            if response.content and len(response.content) > 0:
-                response_text = response.content[0].text
-                viz_spec = self._parse_visualization_spec(response_text)
+            # Parse the response
+            if response:
+                viz_spec = self._parse_visualization_spec(response)
 
                 if viz_spec:
                     logger.info(f"Generated {viz_spec.get('chartType', 'unknown')} visualization")
@@ -106,21 +100,15 @@ class VisualizationService:
             # Build the prompt for modification
             prompt = self._build_modification_prompt(current_spec, results, modification_request)
 
-            # Call Claude Haiku with timeout
+            # Call Databricks Claude endpoint with timeout
             response = await asyncio.wait_for(
-                asyncio.to_thread(
-                    self.client.messages.create,
-                    model=self.model,
-                    max_tokens=2000,
-                    messages=[{"role": "user", "content": prompt}]
-                ),
+                self._call_claude(prompt),
                 timeout=VIZ_GENERATION_TIMEOUT
             )
 
-            # Extract text from response content
-            if response.content and len(response.content) > 0:
-                response_text = response.content[0].text
-                viz_spec = self._parse_visualization_spec(response_text)
+            # Parse the response
+            if response:
+                viz_spec = self._parse_visualization_spec(response)
 
                 if viz_spec:
                     logger.info(f"Modified to {viz_spec.get('chartType', 'unknown')} visualization")
@@ -133,6 +121,43 @@ class VisualizationService:
             return None
         except Exception as e:
             logger.error(f"Error modifying visualization: {str(e)}")
+            return None
+
+    async def _call_claude(self, prompt: str) -> Optional[str]:
+        """
+        Call the Databricks Claude endpoint.
+
+        Args:
+            prompt: The prompt to send to Claude
+
+        Returns:
+            Claude's response text or None on error
+        """
+        try:
+            from databricks.sdk.service.serving import ChatMessage, ChatMessageRole
+
+            messages = [
+                ChatMessage(
+                    role=ChatMessageRole.USER,
+                    content=prompt
+                )
+            ]
+
+            response = await asyncio.to_thread(
+                self.client.serving_endpoints.query,
+                name=self.endpoint_name,
+                messages=messages,
+                max_tokens=2000,
+                temperature=0.3  # Lower temperature for consistent viz specs
+            )
+
+            if response.choices and len(response.choices) > 0:
+                return response.choices[0].message.content
+
+            return None
+
+        except Exception as e:
+            logger.error(f"Failed to call Claude endpoint: {str(e)}")
             return None
 
     def _build_generation_prompt(
