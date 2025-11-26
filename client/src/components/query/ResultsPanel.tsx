@@ -2,7 +2,8 @@
  * Results Panel Component
  *
  * Displays query results with AI summary and follow-up questions.
- * Combines ResultsTable and AI insights in a unified panel.
+ * Combines ResultsTable, AI insights, and visualization in a unified panel.
+ * Chart editing is integrated directly into the visualization card.
  */
 
 import { useState } from 'react'
@@ -12,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { ResultsTable } from './ResultsTable'
 import { ChatInterface } from './ChatInterface'
 import { PlotlyChart } from '@/components/charts/PlotlyChart'
+import { ChartEditor } from '@/components/charts/ChartEditor'
 import type { AskQuestionResponse } from '@/types/genie'
 
 interface ResultsPanelProps {
@@ -152,8 +154,8 @@ export function ResultsPanel({
         </CardContent>
       </Card>
 
-      {/* Data Visualization */}
-      <Card className="border-2 border-accent/20 shadow-xl bg-gradient-to-br from-card to-accent/5">
+      {/* Data Visualization with Integrated Chart Editor */}
+      <Card className="border-2 border-accent/20 shadow-xl bg-gradient-to-br from-card to-accent/5 overflow-hidden">
         <CardHeader className="border-b border-accent/10 bg-accent/5">
           <div className="flex items-center justify-between">
             <CardTitle className="text-xl flex items-center gap-3">
@@ -241,29 +243,37 @@ export function ResultsPanel({
           </div>
         </CardHeader>
         {showChart && (
-          <CardContent className="pt-6">
-            <PlotlyChart
-              results={result.results}
-              visualizationSpec={result.visualizationSpec}
-              isModifying={isModifyingChart}
-              onSaveTemplate={onSaveTemplate}
-            />
-          </CardContent>
+          <>
+            <CardContent className="pt-6">
+              <PlotlyChart
+                results={result.results}
+                visualizationSpec={result.visualizationSpec}
+                isModifying={isModifyingChart}
+                onSaveTemplate={onSaveTemplate}
+              />
+            </CardContent>
+
+            {/* Chart Editor - Integrated into Visualization Card */}
+            {result.visualizationSpec && onEditChart && (
+              <ChartEditor
+                onEditChart={onEditChart}
+                isModifying={isModifyingChart}
+                disabled={!result.visualizationSpec}
+              />
+            )}
+          </>
         )}
       </Card>
 
       {/* Results Table */}
       <ResultsTable results={result.results} sql={result.sql} />
 
-      {/* Chat Interface */}
+      {/* Chat Interface - Analytics Only */}
       <ChatInterface
         queryResults={result.results}
-        visualizationSpec={result.visualizationSpec}
         onSendMessage={onFollowupClick}
-        onEditChart={onEditChart}
         onNewQuery={onNewQuery}
         isProcessing={isProcessing}
-        isModifyingChart={isModifyingChart}
       />
     </div>
   )
