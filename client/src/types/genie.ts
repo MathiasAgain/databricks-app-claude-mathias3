@@ -32,6 +32,9 @@ export interface FontConfig {
   weight?: string
 }
 
+/** Human-readable number format options */
+export type NumberFormat = 'billions' | 'millions' | 'thousands' | 'percentage' | 'currency' | 'compact'
+
 /** Enhanced axis configuration with styling */
 export interface VisualizationAxis {
   column: string
@@ -39,6 +42,10 @@ export interface VisualizationAxis {
   type?: 'category' | 'linear' | 'time' | 'log'
   range?: [number, number]
   tickFormat?: string
+  /** Human-readable format: 'billions', 'millions', 'thousands', 'percentage', 'currency', 'compact' */
+  numberFormat?: NumberFormat
+  /** Number of decimal places (0-4) */
+  decimals?: number
   showGrid?: boolean
   font?: FontConfig
 }
@@ -74,7 +81,23 @@ export interface LayoutConfig {
   titleFont?: FontConfig
 }
 
-/** Complete visualization specification */
+/** Data label configuration for showing values on chart */
+export interface DataLabelConfig {
+  show: boolean
+  position?: 'auto' | 'inside' | 'outside' | 'top' | 'bottom'
+  format?: string
+  font?: FontConfig
+}
+
+/** Complete visualization specification
+ *
+ * Supports two modes:
+ * 1. Structured mode: Use chartType, xAxis, yAxis, etc. for simple charts
+ * 2. Raw Plotly mode: Use plotlyData and plotlyLayout for ANY Plotly feature
+ *
+ * When plotlyData/plotlyLayout are provided, they take precedence over
+ * structured fields, allowing unlimited customization via natural language.
+ */
 export interface VisualizationSpec {
   chartType: string
   title?: string
@@ -86,7 +109,12 @@ export interface VisualizationSpec {
   colors?: string[]
   annotations?: VisualizationAnnotation[]
   layout?: LayoutConfig
+  dataLabels?: DataLabelConfig
   reasoning?: string
+  /** Raw Plotly trace data - when provided, used directly instead of structured fields */
+  plotlyData?: Record<string, unknown>[]
+  /** Raw Plotly layout - when provided, used directly instead of structured fields */
+  plotlyLayout?: Record<string, unknown>
 }
 
 export interface AskQuestionResponse {

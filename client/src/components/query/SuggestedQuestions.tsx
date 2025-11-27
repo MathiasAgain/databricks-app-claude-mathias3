@@ -1,13 +1,10 @@
 /**
  * Suggested Questions Component
  *
- * Displays predefined questions as clickable buttons.
- * Clicking a suggestion automatically submits the query.
+ * Clean, compact list of clickable question suggestions.
  */
 
 import { useState } from 'react'
-import { Button } from '@/components/ui/button'
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useSuggestedQuestions, useAskQuestion } from '@/hooks/useGenie'
 import type { AskQuestionResponse } from '@/types/genie'
@@ -16,9 +13,7 @@ interface SuggestedQuestionsProps {
   onQuestionSelect?: (result: AskQuestionResponse) => void
 }
 
-export function SuggestedQuestions({
-  onQuestionSelect,
-}: SuggestedQuestionsProps) {
+export function SuggestedQuestions({ onQuestionSelect }: SuggestedQuestionsProps) {
   const { data: suggestions, isLoading } = useSuggestedQuestions()
   const { mutate: askQuestion, isPending } = useAskQuestion()
   const [activeQuestion, setActiveQuestion] = useState<string | null>(null)
@@ -32,30 +27,19 @@ export function SuggestedQuestions({
           setActiveQuestion(null)
           onQuestionSelect?.(data)
         },
-        onError: () => {
-          setActiveQuestion(null)
-        },
+        onError: () => setActiveQuestion(null),
       }
     )
   }
 
   if (isLoading) {
     return (
-      <Card className="border-2 shadow-lg">
-        <CardHeader className="bg-primary/5">
-          <CardTitle className="flex items-center gap-2 text-primary">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-            </svg>
-            Quick Start
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 pt-4">
-          {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-12 w-full rounded-lg" />
-          ))}
-        </CardContent>
-      </Card>
+      <div className="space-y-2">
+        <p className="text-sm font-medium text-muted-foreground mb-3">Suggestions</p>
+        {[1, 2, 3].map((i) => (
+          <Skeleton key={i} className="h-10 w-full rounded-lg" />
+        ))}
+      </div>
     )
   }
 
@@ -64,65 +48,36 @@ export function SuggestedQuestions({
   }
 
   return (
-    <div className="space-y-4">
-      <Card className="border-2 border-primary/20 shadow-lg bg-gradient-to-br from-card to-muted/20">
-        <CardHeader className="border-b border-primary/10 bg-primary/5">
-          <CardTitle className="text-lg flex items-center gap-2 text-primary">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-            </svg>
-            Quick Start
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 pt-4">
-          {suggestions.map((suggestion, index) => (
-            <Button
-              key={index}
-              variant="outline"
-              className="w-full justify-start text-left h-auto py-3 px-4 border-2 hover:bg-primary/10 hover:border-primary hover:text-primary transition-all smooth-transition group whitespace-normal"
-              onClick={() => handleQuestionClick(suggestion.question)}
-              disabled={isPending}
-            >
-              <svg className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0 opacity-60 group-hover:opacity-100 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span className="text-sm leading-relaxed">{suggestion.question}</span>
-            </Button>
-          ))}
-        </CardContent>
-      </Card>
+    <div className="space-y-3">
+      <p className="text-sm font-medium text-muted-foreground">Quick Start</p>
 
-      {/* Loading Indicator */}
+      <div className="space-y-2">
+        {suggestions.map((suggestion, index) => (
+          <button
+            key={index}
+            onClick={() => handleQuestionClick(suggestion.question)}
+            disabled={isPending}
+            className={`w-full text-left p-3 text-sm rounded-lg border transition-all ${
+              activeQuestion === suggestion.question
+                ? 'bg-primary/10 border-primary text-primary'
+                : 'bg-card hover:bg-muted/50 hover:border-muted-foreground/20'
+            } ${isPending && activeQuestion !== suggestion.question ? 'opacity-50' : ''}`}
+          >
+            <span className="line-clamp-2">{suggestion.question}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Loading State */}
       {isPending && activeQuestion && (
-        <Card className="border-2 border-accent/50 shadow-lg bg-gradient-to-br from-accent/5 to-secondary/5 fade-in">
-          <CardContent className="pt-4">
-            <div className="space-y-3">
-              <div className="flex items-start gap-3">
-                <div className="mt-1 pulse-subtle">
-                  <svg className="w-5 h-5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <p className="text-xs font-semibold text-accent uppercase tracking-wide mb-1">
-                    Processing Question
-                  </p>
-                  <p className="text-sm font-medium text-foreground">
-                    "{activeQuestion}"
-                  </p>
-                </div>
-              </div>
-
-              {/* Progress Bar */}
-              <div className="space-y-2">
-                <p className="text-xs text-muted-foreground">Generating answer...</p>
-                <div className="h-2 bg-background rounded-full overflow-hidden">
-                  <div className="h-full bg-gradient-to-r from-accent via-primary to-secondary animate-pulse" style={{ width: '70%' }} />
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="p-3 bg-accent/10 rounded-lg border border-accent/20">
+          <div className="flex items-center gap-2">
+            <svg className="w-4 h-4 text-accent animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            <span className="text-xs text-accent">Processing...</span>
+          </div>
+        </div>
       )}
     </div>
   )

@@ -1,13 +1,7 @@
 /**
  * Analytics Page - Main application page
  *
- * Combines query input, results, and chat interface in a unified experience.
- * This is the primary page for the Nielsen Sales Analytics Assistant.
- *
- * Features:
- * - Ask questions via Genie AI
- * - Get AI-powered insights from Claude
- * - Edit charts with natural language
+ * Clean, focused interface for data exploration with AI assistance.
  */
 
 import { useCallback, useState, useEffect } from "react";
@@ -25,10 +19,9 @@ export default function AnalyticsPage() {
   const { mutate: chatWithClaude, isPending: isChatPending } =
     useChatWithClaude();
 
-  // State for chart modification
   const [isModifyingChart, setIsModifyingChart] = useState(false);
 
-  // Chart history store for undo/redo
+  // Chart history store
   const initializeHistory = useChartHistoryStore((state) => state.initializeHistory);
   const addSnapshot = useChartHistoryStore((state) => state.addSnapshot);
   const undo = useChartHistoryStore((state) => state.undo);
@@ -40,36 +33,26 @@ export default function AnalyticsPage() {
   const resetToOriginal = useChartHistoryStore((state) => state.resetToOriginal);
   const saveTemplate = useChartHistoryStore((state) => state.saveTemplate);
 
-  // Use store directly - no local state needed
+  // Query store
   const currentQuery = useQueryStore((state) => state.currentQuery);
-  const conversationHistory = useQueryStore(
-    (state) => state.conversationHistory,
-  );
+  const conversationHistory = useQueryStore((state) => state.conversationHistory);
   const setCurrentQuery = useQueryStore((state) => state.setCurrentQuery);
-  const setConversationHistory = useQueryStore(
-    (state) => state.setConversationHistory,
-  );
-  const clearConversationHistory = useQueryStore(
-    (state) => state.clearConversationHistory,
-  );
+  const setConversationHistory = useQueryStore((state) => state.setConversationHistory);
+  const clearConversationHistory = useQueryStore((state) => state.clearConversationHistory);
   const addToHistory = useQueryStore((state) => state.addToHistory);
 
-  // Initialize chart history when a new query completes
+  // Initialize chart history
   useEffect(() => {
     if (currentQuery?.queryId && currentQuery?.visualizationSpec) {
       initializeHistory(currentQuery.queryId, currentQuery.visualizationSpec);
     }
   }, [currentQuery?.queryId, currentQuery?.visualizationSpec, initializeHistory]);
 
-  // Undo/Redo handlers
   const handleUndo = useCallback(() => {
     if (!currentQuery?.queryId) return;
     const spec = undo(currentQuery.queryId);
     if (spec) {
-      setCurrentQuery({
-        ...currentQuery,
-        visualizationSpec: spec,
-      });
+      setCurrentQuery({ ...currentQuery, visualizationSpec: spec });
     }
   }, [currentQuery, undo, setCurrentQuery]);
 
@@ -77,10 +60,7 @@ export default function AnalyticsPage() {
     if (!currentQuery?.queryId) return;
     const spec = redo(currentQuery.queryId);
     if (spec) {
-      setCurrentQuery({
-        ...currentQuery,
-        visualizationSpec: spec,
-      });
+      setCurrentQuery({ ...currentQuery, visualizationSpec: spec });
     }
   }, [currentQuery, redo, setCurrentQuery]);
 
@@ -88,14 +68,10 @@ export default function AnalyticsPage() {
     if (!currentQuery?.queryId) return;
     const spec = resetToOriginal(currentQuery.queryId);
     if (spec) {
-      setCurrentQuery({
-        ...currentQuery,
-        visualizationSpec: spec,
-      });
+      setCurrentQuery({ ...currentQuery, visualizationSpec: spec });
     }
   }, [currentQuery, resetToOriginal, setCurrentQuery]);
 
-  // Handle saving chart as template
   const handleSaveTemplate = useCallback(
     (spec: import("@/types/genie").VisualizationSpec, thumbnail?: string) => {
       const chartType = spec.chartType || "chart";
@@ -106,18 +82,14 @@ export default function AnalyticsPage() {
         spec,
         thumbnail,
       );
-      // Could add a toast notification here
     },
     [currentQuery?.question, saveTemplate],
   );
 
   const handleQueryComplete = useCallback(
     (result: AskQuestionResponse) => {
-      // Save to store - this persists to localStorage
       setCurrentQuery(result);
       addToHistory(result);
-
-      // Clear conversation history for new query
       clearConversationHistory();
     },
     [setCurrentQuery, addToHistory, clearConversationHistory],
@@ -127,7 +99,6 @@ export default function AnalyticsPage() {
     (question: string) => {
       if (!currentQuery) return;
 
-      // Use Claude chat for follow-up questions instead of re-querying Genie
       const chatRequest: ChatRequest = {
         message: question,
         context: {
@@ -144,55 +115,33 @@ export default function AnalyticsPage() {
             { role: "assistant", content: chatResponse.message },
           ];
 
-          // Update conversation history in store
-          const updatedHistory = [...conversationHistory, ...newMessages];
-          setConversationHistory(updatedHistory);
+          setConversationHistory([...conversationHistory, ...newMessages]);
 
-          // Update the query with Claude's response and optional new visualization
           const updatedQuery: AskQuestionResponse = {
             ...currentQuery,
             aiSummary: chatResponse.message,
             suggestedFollowups: chatResponse.suggestedFollowups,
-            // Update visualization spec if provided in the response
             ...(chatResponse.visualizationSpec && {
               visualizationSpec: chatResponse.visualizationSpec,
             }),
           };
 
-          // Update store - this persists to localStorage
           setCurrentQuery(updatedQuery);
         },
       });
     },
-    [
-      currentQuery,
-      conversationHistory,
-      chatWithClaude,
-      setConversationHistory,
-      setCurrentQuery,
-    ],
+    [currentQuery, conversationHistory, chatWithClaude, setConversationHistory, setCurrentQuery],
   );
 
   const handleNewQuery = useCallback(
     (question: string) => {
-      // Use askQuestion for new data queries via Genie
-      askQuestion(
-        { question },
-        {
-          onSuccess: (result) => {
-            // Save to store and clear conversation history
-            handleQueryComplete(result);
-          },
-        },
-      );
+      askQuestion({ question }, {
+        onSuccess: (result) => handleQueryComplete(result),
+      });
     },
     [askQuestion, handleQueryComplete],
   );
 
-  /**
-   * Handle chart editing requests
-   * Uses Claude chat with visualization context to modify the chart
-   */
   const handleEditChart = useCallback(
     (request: string) => {
       if (!currentQuery) return;
@@ -212,77 +161,44 @@ export default function AnalyticsPage() {
         onSuccess: (chatResponse) => {
           setIsModifyingChart(false);
 
-          // Update visualization spec if Claude modified it
           if (chatResponse.visualizationSpec) {
             const updatedQuery: AskQuestionResponse = {
               ...currentQuery,
               visualizationSpec: chatResponse.visualizationSpec,
             };
 
-            // Add to chart history for undo/redo
             addSnapshot(currentQuery.queryId, chatResponse.visualizationSpec, request);
-
-            // Add to conversation history
-            const newMessages = [
+            setConversationHistory([
+              ...conversationHistory,
               { role: "user", content: `[Chart edit] ${request}` },
-              { role: "assistant", content: "Chart updated successfully." },
-            ];
-            setConversationHistory([...conversationHistory, ...newMessages]);
-
-            // Update store
+              { role: "assistant", content: "Chart updated." },
+            ]);
             setCurrentQuery(updatedQuery);
           }
         },
-        onError: () => {
-          setIsModifyingChart(false);
-        },
+        onError: () => setIsModifyingChart(false),
       });
     },
-    [
-      currentQuery,
-      conversationHistory,
-      chatWithClaude,
-      setConversationHistory,
-      setCurrentQuery,
-      addSnapshot,
-    ],
+    [currentQuery, conversationHistory, chatWithClaude, setConversationHistory, setCurrentQuery, addSnapshot],
   );
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-      {/* Left Sidebar - Suggested Questions */}
-      <aside className="lg:col-span-4 slide-in">
-        <SuggestedQuestions onQuestionSelect={handleQueryComplete} />
-      </aside>
+    <div className="max-w-6xl mx-auto space-y-6">
+      {/* Query Input - Clean, centered */}
+      <div className="bg-card rounded-xl border p-6">
+        <QueryInput onQueryComplete={handleQueryComplete} />
+      </div>
 
-      {/* Main Content Area */}
-      <div className="lg:col-span-8 space-y-6">
-        {/* Query Input */}
-        <section className="fade-in">
-          <div className="bg-gradient-to-r from-card to-muted/30 p-6 rounded-xl border-2 border-border shadow-lg">
-            <h2 className="text-lg font-semibold text-card-foreground mb-4 flex items-center gap-2">
-              <svg
-                className="w-5 h-5 text-accent"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
-                />
-              </svg>
-              Ask Your Question
-            </h2>
-            <QueryInput onQueryComplete={handleQueryComplete} />
-          </div>
-        </section>
+      {/* Main Content */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* Suggested Questions - Sidebar */}
+        <aside className="lg:col-span-1 order-2 lg:order-1">
+          <SuggestedQuestions onQuestionSelect={handleQueryComplete} />
+        </aside>
 
-        {/* Results Panel */}
-        {currentQuery && (
-          <section className="fade-in">
+        {/* Results - Main Area */}
+        <div className="lg:col-span-3 order-1 lg:order-2">
+          {currentQuery ? (
             <ResultsPanel
               result={currentQuery}
               onFollowupClick={handleFollowupClick}
@@ -290,7 +206,6 @@ export default function AnalyticsPage() {
               onNewQuery={handleNewQuery}
               isProcessing={isChatPending}
               isModifyingChart={isModifyingChart}
-              // Chart history props
               onUndo={handleUndo}
               onRedo={handleRedo}
               onResetChart={handleResetChart}
@@ -298,11 +213,21 @@ export default function AnalyticsPage() {
               canRedo={canRedo(currentQuery.queryId)}
               historyIndex={getCurrentIndex(currentQuery.queryId)}
               historyTotal={getTotalSnapshots(currentQuery.queryId)}
-              // Template props
               onSaveTemplate={handleSaveTemplate}
             />
-          </section>
-        )}
+          ) : (
+            <div className="flex items-center justify-center h-64 bg-muted/20 rounded-lg border border-dashed">
+              <div className="text-center">
+                <svg className="w-12 h-12 mx-auto text-muted-foreground/40 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                <p className="text-muted-foreground">
+                  Ask a question or select a suggestion to get started
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -268,40 +268,37 @@ async def chat_with_claude(
             current_viz_spec=current_viz_spec  # Enables modify_visualization tool
         )
 
-        # FALLBACK: If tool calling isn't supported by Databricks endpoint,
-        # detect visualization requests using keywords and call viz service directly
+        # When there's an active visualization, always try to modify it
+        # Let Claude decide if the message is about visualization or not
         updated_viz_spec = response.get("visualization_spec")
 
         if not updated_viz_spec and current_viz_spec and query_results:
-            # Check if this is a visualization modification request using keyword detection
-            from server.services.visualization_service import VisualizationService
-            from server.models import QueryResults, VisualizationSpec
+            # Always try visualization modification - Claude will decide if it applies
+            from server.models import QueryResults
 
-            if VisualizationService.is_visualization_request(request.message):
-                logger.info("Detected visualization request (fallback mode) - calling viz service directly")
+            logger.info("Active visualization present - sending to Claude for interpretation")
 
-                # Convert dict to QueryResults object
-                results_obj = QueryResults(
-                    columns=query_results["columns"],
-                    rows=query_results["rows"],
-                    rowCount=query_results["rowCount"]
-                )
+            # Convert dict to QueryResults object
+            results_obj = QueryResults(
+                columns=query_results["columns"],
+                rows=query_results["rows"],
+                rowCount=query_results["rowCount"]
+            )
 
-                # Call visualization service directly
-                viz_service = get_visualization_service()
-                # current_viz_spec is already a VisualizationSpec object from the model
-                updated_viz_spec = await viz_service.modify_visualization(
-                    current_spec=current_viz_spec,
-                    results=results_obj,
-                    modification_request=request.message
-                )
+            # Call visualization service - Claude will interpret the natural language
+            viz_service = get_visualization_service()
+            updated_viz_spec = await viz_service.modify_visualization(
+                current_spec=current_viz_spec,
+                results=results_obj,
+                modification_request=request.message
+            )
 
-                if updated_viz_spec:
-                    logger.info(f"Fallback viz modification successful: {updated_viz_spec.chartType}")
-                    # Convert to dict for response
-                    updated_viz_spec = updated_viz_spec.model_dump(by_alias=True)
-                else:
-                    logger.warning("Fallback viz modification failed")
+            if updated_viz_spec:
+                logger.info(f"Visualization modified: {updated_viz_spec.chartType}")
+                # Convert to dict for response
+                updated_viz_spec = updated_viz_spec.model_dump(by_alias=True)
+            else:
+                logger.info("Claude determined this was not a visualization request")
 
         # Build response - visualization_spec will be present if Claude called the tool OR fallback succeeded
         chat_response = ChatResponse(

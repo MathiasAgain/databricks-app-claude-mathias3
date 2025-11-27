@@ -33,6 +33,161 @@ interface PlotlyChartProps {
 }
 
 /**
+ * Number format configuration for human-readable formats
+ */
+interface NumberFormatConfig {
+  divisor: number
+  suffix: string
+  multiplier?: number
+  prefix?: string
+}
+
+/**
+ * Get number format configuration from human-readable format string
+ */
+function getNumberFormatConfig(format?: string): NumberFormatConfig | null {
+  if (!format) return null
+
+  const formatLower = format.toLowerCase()
+
+  switch (formatLower) {
+    case 'billions':
+      return { divisor: 1e9, suffix: 'B' }
+    case 'millions':
+      return { divisor: 1e6, suffix: 'M' }
+    case 'thousands':
+      return { divisor: 1e3, suffix: 'K' }
+    case 'percentage':
+      return { divisor: 1, suffix: '%', multiplier: 100 }
+    case 'currency':
+      return { divisor: 1, suffix: '', prefix: '$' }
+    case 'compact':
+      // Compact format auto-selects based on value magnitude
+      return null // Will be handled specially
+    default:
+      return null
+  }
+}
+
+/**
+ * Format a number using human-readable numberFormat
+ */
+function formatWithNumberFormat(value: number, format?: string, decimals: number = 0): string {
+  const config = getNumberFormatConfig(format)
+
+  if (!config) {
+    // Handle 'compact' format - auto-select suffix based on magnitude
+    if (format?.toLowerCase() === 'compact') {
+      const absValue = Math.abs(value)
+      if (absValue >= 1e9) {
+        const formatted = (value / 1e9).toFixed(decimals)
+        return formatted + 'B'
+      } else if (absValue >= 1e6) {
+        const formatted = (value / 1e6).toFixed(decimals)
+        return formatted + 'M'
+      } else if (absValue >= 1e3) {
+        const formatted = (value / 1e3).toFixed(decimals)
+        return formatted + 'K'
+      }
+      return value.toFixed(decimals)
+    }
+    return value.toLocaleString()
+  }
+
+  let displayValue = value / config.divisor
+  if (config.multiplier) {
+    displayValue *= config.multiplier
+  }
+
+  const formatted = displayValue.toFixed(decimals)
+  return (config.prefix || '') + formatted + config.suffix
+}
+
+/**
+ * Allowed Plotly trace properties for validation (security whitelist)
+ */
+const ALLOWED_TRACE_PROPS = new Set([
+  'type', 'x', 'y', 'z', 'text', 'marker', 'line', 'mode', 'name',
+  'hovertemplate', 'hoverinfo', 'textposition', 'textfont', 'textinfo',
+  'fill', 'fillcolor', 'labels', 'values', 'colorscale', 'showlegend',
+  'legendgroup', 'opacity', 'orientation', 'width', 'base', 'offset',
+  'hole', 'pull', 'domain', 'texttemplate', 'insidetextorientation',
+  'customdata', 'ids', 'error_x', 'error_y', 'connectgaps', 'stackgroup'
+])
+
+/**
+ * Type guard to check if an object is a valid Plotly trace
+ */
+function isValidPlotlyTrace(obj: unknown): obj is Plotly.Data {
+  if (typeof obj !== 'object' || obj === null) return false
+  const trace = obj as Record<string, unknown>
+  // Must have a type property that's a string
+  return typeof trace.type === 'string' ||
+    // Some traces like scatter don't require type
+    (Array.isArray(trace.x) || Array.isArray(trace.y) || Array.isArray(trace.values))
+}
+
+/**
+ * Validate and sanitize raw Plotly data from Claude
+ * Security: Whitelists allowed properties to prevent malicious config
+ */
+function validatePlotlyData(data: unknown[]): Plotly.Data[] {
+  if (!Array.isArray(data)) {
+    console.error('[PlotlyChart] plotlyData is not an array')
+    return []
+  }
+
+  return data
+    .filter((trace, index) => {
+      if (!isValidPlotlyTrace(trace)) {
+        console.warn(`[PlotlyChart] Skipping invalid trace at index ${index}`)
+        return false
+      }
+      return true
+    })
+    .map(trace => {
+      const validatedTrace: Record<string, unknown> = {}
+      const traceObj = trace as Record<string, unknown>
+
+      for (const key of Object.keys(traceObj)) {
+        // Only allow whitelisted properties
+        if (ALLOWED_TRACE_PROPS.has(key)) {
+          validatedTrace[key] = traceObj[key]
+        } else {
+          console.warn(`[PlotlyChart] Removed non-whitelisted trace property: ${key}`)
+        }
+      }
+
+      return validatedTrace as Plotly.Data
+    })
+}
+
+/**
+ * Format a value using d3-format-like format string
+ */
+function formatValue(value: any, format?: string): string {
+  if (value === null || value === undefined) return ''
+  const num = typeof value === 'number' ? value : parseFloat(String(value))
+  if (isNaN(num)) return String(value)
+
+  if (!format) return String(num)
+
+  // Simple format handling for common cases
+  if (format === '.0f') return Math.round(num).toString()
+  if (format === '.1f') return num.toFixed(1)
+  if (format === '.2f') return num.toFixed(2)
+  if (format === ',.0f') return Math.round(num).toLocaleString()
+  if (format === ',.2f') return num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  if (format === '$,.0f') return '$' + Math.round(num).toLocaleString()
+  if (format === '$,.2f') return '$' + num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  if (format === '.0%') return Math.round(num * 100) + '%'
+  if (format === '.1%') return (num * 100).toFixed(1) + '%'
+
+  // Default fallback
+  return String(num)
+}
+
+/**
  * Transform QueryResults into Plotly data format based on visualization spec
  */
 function transformToPlotlyData(
@@ -66,6 +221,28 @@ function transformToPlotlyData(
   const yData = getColumnData(spec.yAxis?.column)
   const zData = spec.zAxis ? getColumnData(spec.zAxis.column) : []
 
+  // Data labels configuration
+  const dataLabels = spec.dataLabels
+  const showDataLabels = dataLabels?.show === true
+
+  // Map position to Plotly textposition
+  const mapTextPosition = (position?: string): string => {
+    switch (position) {
+      case 'inside': return 'inside'
+      case 'outside': return 'outside'
+      case 'top': return 'top'
+      case 'bottom': return 'bottom'
+      default: return 'auto'
+    }
+  }
+
+  // Build text font from dataLabels config
+  const textFont = showDataLabels && dataLabels?.font ? {
+    size: dataLabels.font.size,
+    family: dataLabels.font.family,
+    color: dataLabels.font.color,
+  } : undefined
+
   // Common trace properties
   const baseTrace: Partial<Plotly.Data> = {
     name: spec.yAxis?.label || spec.yAxis?.column || 'Value',
@@ -83,13 +260,20 @@ function transformToPlotlyData(
         marker: {
           color: spec.colors?.[0] || 'rgb(55, 83, 109)',
         },
+        // Data labels
+        ...(showDataLabels ? {
+          text: yData.map(v => dataLabels?.format ?
+            formatValue(v, dataLabels.format) : String(v)),
+          textposition: mapTextPosition(dataLabels?.position),
+          textfont: textFont,
+        } : {}),
       }]
 
     case 'line':
       return [{
         ...baseTrace,
         type: 'scatter',
-        mode: 'lines+markers',
+        mode: showDataLabels ? 'lines+markers+text' : 'lines+markers',
         x: xData,
         y: yData,
         line: {
@@ -99,19 +283,33 @@ function transformToPlotlyData(
         marker: {
           size: 6,
         },
+        // Data labels
+        ...(showDataLabels ? {
+          text: yData.map(v => dataLabels?.format ?
+            formatValue(v, dataLabels.format) : String(v)),
+          textposition: mapTextPosition(dataLabels?.position) || 'top',
+          textfont: textFont,
+        } : {}),
       }]
 
     case 'scatter':
       return [{
         ...baseTrace,
         type: 'scatter',
-        mode: 'markers',
+        mode: showDataLabels ? 'markers+text' : 'markers',
         x: xData,
         y: yData,
         marker: {
           size: 8,
           color: spec.colors?.[0] || 'rgb(55, 83, 109)',
         },
+        // Data labels
+        ...(showDataLabels ? {
+          text: yData.map(v => dataLabels?.format ?
+            formatValue(v, dataLabels.format) : String(v)),
+          textposition: mapTextPosition(dataLabels?.position) || 'top',
+          textfont: textFont,
+        } : {}),
       }]
 
     case 'pie':
@@ -123,13 +321,17 @@ function transformToPlotlyData(
         marker: {
           colors: spec.colors,
         },
+        // Data labels for pie use textinfo
+        textinfo: showDataLabels ? 'label+value+percent' : 'percent',
+        textposition: showDataLabels ? (dataLabels?.position === 'outside' ? 'outside' : 'inside') : 'auto',
+        textfont: textFont,
       }]
 
     case 'area':
       return [{
         ...baseTrace,
         type: 'scatter',
-        mode: 'lines',
+        mode: showDataLabels ? 'lines+text' : 'lines',
         x: xData,
         y: yData,
         fill: 'tozeroy',
@@ -140,6 +342,13 @@ function transformToPlotlyData(
           color: spec.colors?.[0] || 'rgb(55, 83, 109)',
           width: 2,
         },
+        // Data labels
+        ...(showDataLabels ? {
+          text: yData.map(v => dataLabels?.format ?
+            formatValue(v, dataLabels.format) : String(v)),
+          textposition: mapTextPosition(dataLabels?.position) || 'top',
+          textfont: textFont,
+        } : {}),
       }]
 
     case 'histogram':
@@ -245,11 +454,55 @@ function transformToPlotlyData(
 }
 
 /**
+ * Generate tick values and text for human-readable numberFormat
+ */
+function generateFormattedTicks(
+  dataValues: number[],
+  numberFormat?: string,
+  decimals: number = 0
+): { tickvals: number[], ticktext: string[] } | null {
+  if (!numberFormat) return null
+
+  const config = getNumberFormatConfig(numberFormat)
+  const isCompact = numberFormat.toLowerCase() === 'compact'
+
+  if (!config && !isCompact) return null
+
+  // Filter out NaN values and get numeric data
+  const validValues = dataValues.filter(v => !isNaN(v) && v !== null && v !== undefined)
+  if (validValues.length === 0) return null
+
+  const minVal = Math.min(...validValues)
+  const maxVal = Math.max(...validValues)
+  const range = maxVal - minVal
+
+  // Generate ~5-7 nice tick values
+  const numTicks = 6
+  const tickValues: number[] = []
+
+  for (let i = 0; i <= numTicks; i++) {
+    const value = minVal + (range * i / numTicks)
+    tickValues.push(value)
+  }
+
+  // Format the tick labels
+  const tickLabels = tickValues.map(val => {
+    if (isCompact) {
+      return formatWithNumberFormat(val, 'compact', decimals)
+    }
+    return formatWithNumberFormat(val, numberFormat, decimals)
+  })
+
+  return { tickvals: tickValues, ticktext: tickLabels }
+}
+
+/**
  * Generate Plotly layout configuration
  */
 function generateLayout(
   spec: VisualizationSpec,
-  isDarkMode: boolean
+  isDarkMode: boolean,
+  yDataValues?: number[]
 ): Partial<Plotly.Layout> {
   const bgColor = isDarkMode ? '#1a1a1a' : '#ffffff'
   const textColor = isDarkMode ? '#e5e5e5' : '#333333'
@@ -332,8 +585,16 @@ function generateLayout(
       showgrid: spec.xAxis?.showGrid !== false,
     }
 
-    // Y-Axis configuration with enhanced features
+    // Y-Axis configuration with enhanced features and numberFormat support
     const yAxisFont = spec.yAxis?.font || {}
+    const yNumberFormat = spec.yAxis?.numberFormat
+    const yDecimals = spec.yAxis?.decimals ?? 0
+
+    // Generate custom ticks if numberFormat is specified
+    const yAxisTicks = yDataValues && yNumberFormat
+      ? generateFormattedTicks(yDataValues, yNumberFormat, yDecimals)
+      : null
+
     baseLayout.yaxis = {
       title: {
         text: spec.yAxis?.label || spec.yAxis?.column || '',
@@ -347,7 +608,14 @@ function generateLayout(
       color: textColor,
       type: spec.yAxis?.type as any || 'linear',
       range: spec.yAxis?.range as [number, number] | undefined,
-      tickformat: spec.yAxis?.tickFormat,
+      // Use custom tick formatting when numberFormat is specified
+      ...(yAxisTicks ? {
+        tickmode: 'array',
+        tickvals: yAxisTicks.tickvals,
+        ticktext: yAxisTicks.ticktext,
+      } : {
+        tickformat: spec.yAxis?.tickFormat,
+      }),
       showgrid: spec.yAxis?.showGrid !== false,
     }
 
@@ -503,15 +771,79 @@ export function PlotlyChart({
   }
 
   // Generate chart data and layout
+  // When plotlyData is provided, use it directly (raw Plotly mode)
+  // Otherwise, fall back to structured transformation
   const chartData = useMemo(() => {
     if (!visualizationSpec) return []
-    return transformToPlotlyData(results, visualizationSpec)
+
+    try {
+      // Raw Plotly mode: validate and use plotlyData
+      if (visualizationSpec.plotlyData && visualizationSpec.plotlyData.length > 0) {
+        console.log('[PlotlyChart] Using raw plotlyData from Claude')
+        const validatedData = validatePlotlyData(visualizationSpec.plotlyData)
+        if (validatedData.length > 0) {
+          return validatedData
+        }
+        // Fall back to structured mode if validation fails
+        console.warn('[PlotlyChart] Raw Plotly data validation failed, falling back to structured mode')
+      }
+
+      // Structured mode: transform using our logic
+      return transformToPlotlyData(results, visualizationSpec)
+    } catch (error) {
+      console.error('[PlotlyChart] Failed to generate chart data:', error)
+      return [] // Return empty array instead of crashing
+    }
   }, [results, visualizationSpec])
 
   const layout = useMemo(() => {
     if (!visualizationSpec) return {}
-    return generateLayout(visualizationSpec, isDarkMode)
-  }, [visualizationSpec, isDarkMode])
+
+    try {
+      // Raw Plotly mode: use plotlyLayout directly
+      if (visualizationSpec.plotlyLayout) {
+        console.log('[PlotlyChart] Using raw plotlyLayout from Claude')
+        const bgColor = isDarkMode ? '#1a1a1a' : '#ffffff'
+        const textColor = isDarkMode ? '#e5e5e5' : '#333333'
+
+        // Type-safe access to font color
+        const rawLayout = visualizationSpec.plotlyLayout
+        const fontObj = rawLayout.font && typeof rawLayout.font === 'object' ? rawLayout.font : {}
+        const fontColor = 'color' in fontObj ? (fontObj as { color?: string }).color : undefined
+
+        // Merge with theme colors for consistent appearance
+        return {
+          ...rawLayout,
+          paper_bgcolor: rawLayout.paper_bgcolor || bgColor,
+          plot_bgcolor: rawLayout.plot_bgcolor || bgColor,
+          font: {
+            ...fontObj,
+            color: fontColor || textColor,
+          },
+        } as Partial<Plotly.Layout>
+      }
+
+      // Structured mode: generate layout from our logic
+      // Extract Y data values for number formatting
+      const yColumnName = visualizationSpec.yAxis?.column
+      let yDataValues: number[] | undefined
+      if (yColumnName && results.columns && results.rows) {
+        const yIndex = results.columns.findIndex(col =>
+          col.toLowerCase() === yColumnName.toLowerCase()
+        )
+        if (yIndex >= 0) {
+          yDataValues = results.rows.map(row => {
+            const val = row[yIndex]
+            return typeof val === 'number' ? val : parseFloat(String(val))
+          }).filter(v => !isNaN(v))
+        }
+      }
+      return generateLayout(visualizationSpec, isDarkMode, yDataValues)
+    } catch (error) {
+      console.error('[PlotlyChart] Failed to generate layout:', error)
+      return {} // Return empty layout instead of crashing
+    }
+  }, [visualizationSpec, isDarkMode, results])
 
   // Early return if no data or spec
   if (!visualizationSpec || !results || results.rows.length === 0) {

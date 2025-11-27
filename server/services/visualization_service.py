@@ -24,11 +24,17 @@ class VisualizationService:
     """
     Service for generating and modifying visualization specifications.
     Uses the Databricks Claude endpoint for consistent deployment.
+    Falls back to smart defaults if Claude is unavailable.
     """
 
     def __init__(self):
         """Initialize the visualization service with Databricks workspace client."""
-        self.client = WorkspaceClient()
+        try:
+            self.client = WorkspaceClient()
+            logger.info("VisualizationService initialized with WorkspaceClient")
+        except Exception as e:
+            logger.error(f"Failed to initialize WorkspaceClient: {e}")
+            self.client = None
         self.endpoint_name = "databricks-claude-sonnet-4-5"
 
     async def generate_visualization(
@@ -39,6 +45,7 @@ class VisualizationService:
     ) -> Optional[VisualizationSpec]:
         """
         Generate an optimal visualization specification for query results.
+        Falls back to smart defaults if Claude is unavailable.
 
         Args:
             results: Query results with data and metadata
@@ -48,33 +55,138 @@ class VisualizationService:
         Returns:
             VisualizationSpec or None if visualization not appropriate
         """
+        logger.info(f"Generating visualization for {results.rowCount} rows, {len(results.columns)} columns")
+
+        # Try Claude first if client is available
+        if self.client:
+            try:
+                # Build the prompt for chart generation
+                prompt = self._build_generation_prompt(results, user_question, analysis_context)
+
+                # Call Databricks Claude endpoint with timeout
+                response = await asyncio.wait_for(
+                    self._call_claude(prompt),
+                    timeout=VIZ_GENERATION_TIMEOUT
+                )
+
+                # Parse the response
+                if response:
+                    viz_spec = self._parse_visualization_spec(response)
+
+                    if viz_spec:
+                        logger.info(f"Generated {viz_spec.get('chartType', 'unknown')} visualization via Claude")
+                        return VisualizationSpec(**viz_spec)
+
+            except asyncio.TimeoutError:
+                logger.warning("Visualization generation timed out, using fallback")
+            except Exception as e:
+                logger.warning(f"Claude visualization failed: {str(e)}, using fallback")
+        else:
+            logger.warning("WorkspaceClient not available, using fallback chart generation")
+
+        # Fallback: Generate a smart default visualization
+        logger.info("Using fallback visualization generation")
+        return self._generate_fallback_visualization(results, user_question)
+
+    def _generate_fallback_visualization(
+        self,
+        results: QueryResults,
+        user_question: str
+    ) -> Optional[VisualizationSpec]:
+        """
+        Generate a fallback visualization based on data structure.
+        Uses heuristics to pick the best chart type.
+        """
         try:
-            logger.info(f"Generating visualization for {results.rowCount} rows, {len(results.columns)} columns")
+            if not results.columns or not results.rows or results.rowCount == 0:
+                logger.info("No data for visualization")
+                return None
 
-            # Build the prompt for chart generation
-            prompt = self._build_generation_prompt(results, user_question, analysis_context)
+            columns = results.columns
+            rows = results.rows
 
-            # Call Databricks Claude endpoint with timeout
-            response = await asyncio.wait_for(
-                self._call_claude(prompt),
-                timeout=VIZ_GENERATION_TIMEOUT
-            )
+            # Analyze column types by sampling data
+            numeric_cols = []
+            categorical_cols = []
+            date_cols = []
 
-            # Parse the response
-            if response:
-                viz_spec = self._parse_visualization_spec(response)
+            for i, col in enumerate(columns):
+                col_lower = col.lower()
+                # Check for date-like columns
+                if any(kw in col_lower for kw in ['date', 'time', 'year', 'month', 'week', 'day']):
+                    date_cols.append(col)
+                else:
+                    # Sample values to determine type
+                    sample_values = [row[i] for row in rows[:5] if len(row) > i and row[i] is not None]
+                    if sample_values:
+                        if all(isinstance(v, (int, float)) or (isinstance(v, str) and v.replace('.', '').replace('-', '').isdigit()) for v in sample_values):
+                            numeric_cols.append(col)
+                        else:
+                            categorical_cols.append(col)
 
-                if viz_spec:
-                    logger.info(f"Generated {viz_spec.get('chartType', 'unknown')} visualization")
-                    return VisualizationSpec(**viz_spec)
+            logger.info(f"Column analysis: numeric={numeric_cols}, categorical={categorical_cols}, date={date_cols}")
 
-            return None
+            # Determine chart type based on data structure
+            chart_type = "bar"  # Default
+            x_column = None
+            y_column = None
+            title = "Data Visualization"
 
-        except asyncio.TimeoutError:
-            logger.error("Visualization generation timed out")
-            return None
+            # Choose best chart configuration
+            if date_cols and numeric_cols:
+                # Time series data -> line chart
+                chart_type = "line"
+                x_column = date_cols[0]
+                y_column = numeric_cols[0]
+                title = f"{y_column} over {x_column}"
+            elif categorical_cols and numeric_cols:
+                # Category + number -> bar chart
+                chart_type = "bar"
+                x_column = categorical_cols[0]
+                y_column = numeric_cols[0]
+                title = f"{y_column} by {x_column}"
+            elif len(numeric_cols) >= 2:
+                # Two numeric columns -> scatter plot
+                chart_type = "scatter"
+                x_column = numeric_cols[0]
+                y_column = numeric_cols[1]
+                title = f"{y_column} vs {x_column}"
+            elif len(categorical_cols) >= 1 and len(columns) >= 2:
+                # Use first categorical as x, second column as y
+                chart_type = "bar"
+                x_column = columns[0]
+                y_column = columns[1]
+                title = f"{y_column} by {x_column}"
+            else:
+                # Default: use first two columns
+                x_column = columns[0]
+                y_column = columns[1] if len(columns) > 1 else columns[0]
+                title = f"{y_column} by {x_column}"
+
+            # For pie charts, limit to small category counts
+            if chart_type == "bar" and results.rowCount <= 6 and categorical_cols:
+                chart_type = "pie"
+
+            spec_dict = {
+                "chartType": chart_type,
+                "title": title,
+                "xAxis": {
+                    "column": x_column,
+                    "label": x_column.replace("_", " ").title()
+                },
+                "yAxis": {
+                    "column": y_column,
+                    "label": y_column.replace("_", " ").title()
+                },
+                "colors": ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"],
+                "reasoning": f"Fallback: {chart_type} chart based on data structure analysis"
+            }
+
+            logger.info(f"Generated fallback {chart_type} visualization")
+            return VisualizationSpec(**spec_dict)
+
         except Exception as e:
-            logger.error(f"Error generating visualization: {str(e)}")
+            logger.error(f"Fallback visualization generation failed: {str(e)}")
             return None
 
     async def modify_visualization(
@@ -267,6 +379,12 @@ Return ONLY a JSON object with this structure:
     "margin": {{"l": 60, "r": 40, "t": 60, "b": 60}},
     "titleFont": {{"size": 18, "family": "Arial", "color": "#111", "weight": "bold"}}
   }},
+  "dataLabels": {{  // Optional: show values on chart elements
+    "show": true,           // Enable/disable data labels
+    "position": "auto",     // Position: "auto", "inside", "outside", "top", "bottom"
+    "format": ",.0f",       // Format string: ".0f", ",.2f", "$,.0f", ".0%", etc.
+    "font": {{"size": 12, "color": "#333", "weight": "bold"}}
+  }},
   "reasoning": "Brief explanation of why this chart type"
 }}
 
@@ -280,66 +398,127 @@ Return ONLY the JSON, no other text."""
         results: QueryResults,
         modification_request: str
     ) -> str:
-        """Build prompt for visualization modification."""
+        """Build prompt for visualization modification using raw Plotly configuration."""
 
         current_spec_json = current_spec.model_dump(by_alias=True)
 
-        prompt = f"""You are a data visualization expert. Modify the current visualization based on the user's request.
+        # Get sample data for Claude to use in traces
+        sample_rows = results.rows[:100]  # Limit to 100 rows for the prompt
+        columns = results.columns
 
-**Current Visualization:**
+        # Build column data for Claude to reference (with bounds checking)
+        column_data = {}
+        for i, col in enumerate(columns):
+            column_data[col] = [row[i] if i < len(row) else None for row in sample_rows]
+
+        prompt = f"""You are a Plotly.js visualization expert. The user wants to modify their chart using natural language. You have COMPLETE control over the Plotly configuration.
+
+**IMPORTANT: You are generating RAW Plotly.js configuration that will be passed directly to Plotly.newPlot(). You can use ANY valid Plotly.js feature.**
+
+**Current Visualization Spec:**
 ```json
 {json.dumps(current_spec_json, indent=2)}
 ```
 
-**Data Available:**
-- Columns: {', '.join(results.columns)}
+**Available Data:**
+- Columns: {json.dumps(columns)}
 - Row count: {results.rowCount}
+- Sample data (first {len(sample_rows)} rows):
+```json
+{json.dumps(column_data, indent=2)}
+```
 
-**User Modification Request:** "{modification_request}"
+**User's Natural Language Request:** "{modification_request}"
 
-**Your Task:**
-Modify the visualization specification according to the user's request. Common modifications:
+**YOUR TASK:**
+Interpret the user's request and generate a complete Plotly configuration. You MUST output `plotlyData` (array of traces) and `plotlyLayout` (layout object) that will be passed directly to Plotly.
 
-**Color Changes:**
-- "make it blue" → Update colors: ["#3b82f6"]
-- "make the bars yellow" → Update colors: ["#eab308"]
-- "red and green bars" → Update colors: ["#ef4444", "#10b981"]
-- "traffic light colors" → Update colors: ["#ef4444", "#f59e0b", "#10b981"]
+**Key Plotly.js Features You Can Use:**
 
-**Color Palette:**
-- blue: #3b82f6, red: #ef4444, green: #10b981, yellow: #eab308
-- orange: #f97316, purple: #a855f7, pink: #ec4899, cyan: #06b6d4
+1. **Trace Types**: bar, scatter, pie, heatmap, histogram, box, violin, sunburst, treemap, sankey, candlestick, ohlc, waterfall, funnel, indicator, choropleth, scattergeo, scatter3d, surface, mesh3d, etc.
 
-**Chart Type Changes:**
-- "show as pie chart" → Change chartType to "pie"
-- "convert to line chart" → Change chartType to "line"
-- "make it a bar chart" → Change chartType to "bar"
+2. **Number Formatting** (tickformat uses d3-format):
+   - Billions: tickformat: ".3s" shows "1.23B", tickformat: ".0s" shows "1B"
+   - Millions: tickformat: ".2s" shows "1.2M"
+   - Currency: tickformat: "$,.0f" shows "$1,234,567"
+   - Percentage: tickformat: ".0%" shows "45%"
+   - Commas: tickformat: ",.0f" shows "1,234,567"
+   - Custom: tickvals: [1e9, 2e9, 3e9], ticktext: ["1B", "2B", "3B"]
 
-**Font Customization:**
-- "make the title bigger" → Update layout.titleFont.size (e.g., 24)
-- "bold axis labels" → Update xAxis.font.weight to "bold"
-- "increase font size" → Update relevant font.size values
-- "change to Arial" → Update font.family to "Arial"
+3. **Data Labels** (text on traces):
+   - Add text: text: [array of values], textposition: "outside"/"inside"/"auto"
+   - Format: texttemplate: "%{{value:.2f}}" or custom formatting
+   - Style: textfont: {{size: 14, color: "#333"}}
 
-**Annotation Changes:**
-- "add label at peak" → Add to annotations array with text, x, y coordinates
-- "label the highest bar" → Add annotation with showarrow: true, pointing to max value
-- "add annotation with bigger font" → Include font: {{"size": 16, "weight": "bold"}}
-- "highlight this point" → Add annotation with bgcolor and bordercolor
+4. **Colors**: marker.color, line.color, colorscale, etc.
 
-**Layout Changes:**
-- "make it wider" → Update layout.width (e.g., 1000)
-- "increase chart height" → Update layout.height (e.g., 500)
-- "hide the legend" → Set layout.showlegend to false
-- "move legend to bottom" → Set layout.legendPosition to "bottom"
+5. **Layout Options**: title, xaxis, yaxis, legend, annotations, shapes, images, etc.
 
-**Axis Customization:**
-- "set Y-axis range to 0-100" → Update yAxis.range: [0, 100]
-- "format as currency" → Update tickFormat: "$,.0f"
-- "hide grid lines" → Set showGrid to false
-- "log scale on Y" → Set yAxis.type to "log"
+6. **Axis Configuration**:
+   - Title: xaxis.title.text
+   - Range: xaxis.range: [min, max]
+   - Type: xaxis.type: "linear"/"log"/"date"/"category"
+   - Grid: xaxis.showgrid, xaxis.gridcolor
+   - Ticks: xaxis.tickformat, xaxis.tickvals, xaxis.ticktext
 
-Return ONLY a JSON object with the complete modified specification (same structure as current). No other text."""
+**Example Response for "show values in billions with no decimals":**
+```json
+{{
+  "chartType": "bar",
+  "title": "Sales by Region",
+  "plotlyData": [
+    {{
+      "type": "bar",
+      "x": ["North", "South", "East", "West"],
+      "y": [1500000000, 2300000000, 1800000000, 2100000000],
+      "marker": {{"color": "#3b82f6"}},
+      "text": ["1.5B", "2.3B", "1.8B", "2.1B"],
+      "textposition": "outside"
+    }}
+  ],
+  "plotlyLayout": {{
+    "title": {{"text": "Sales by Region", "font": {{"size": 18}}}},
+    "yaxis": {{
+      "title": {{"text": "Sales"}},
+      "tickformat": ".0s"
+    }},
+    "xaxis": {{"title": {{"text": "Region"}}}}
+  }},
+  "reasoning": "Formatted Y-axis to show values in billions using .0s format (SI notation with 0 decimal places)"
+}}
+```
+
+**Example Response for "make it a pie chart with percentages":**
+```json
+{{
+  "chartType": "pie",
+  "title": "Distribution",
+  "plotlyData": [
+    {{
+      "type": "pie",
+      "labels": ["A", "B", "C"],
+      "values": [30, 50, 20],
+      "textinfo": "label+percent",
+      "textposition": "inside",
+      "marker": {{"colors": ["#3b82f6", "#10b981", "#f59e0b"]}}
+    }}
+  ],
+  "plotlyLayout": {{
+    "title": {{"text": "Distribution"}}
+  }},
+  "reasoning": "Converted to pie chart with percentage labels"
+}}
+```
+
+**CRITICAL REQUIREMENTS:**
+1. ALWAYS include `plotlyData` array with complete trace(s) using the actual data from the columns
+2. ALWAYS include `plotlyLayout` object
+3. Include `chartType` for reference
+4. Use the actual column data provided above in your traces
+5. Return ONLY valid JSON, no markdown, no explanation
+6. You can do ANYTHING Plotly.js supports - there are no limitations!
+
+Return the complete JSON object:"""
 
         return prompt
 
@@ -351,7 +530,7 @@ Return ONLY a JSON object with the complete modified specification (same structu
             response: Raw response text
 
         Returns:
-            Parsed visualization spec dict or None
+            Parsed visualization spec dict or None if parsing fails
         """
         try:
             # Try to extract JSON from response
@@ -391,28 +570,44 @@ Return ONLY a JSON object with the complete modified specification (same structu
         """
         viz_keywords = [
             # Chart types
-            "chart", "graph", "plot", "visualize", "visualization",
+            "chart", "graph", "plot", "visualize", "visualization", "visual",
             "pie", "bar", "line", "scatter", "heatmap", "histogram", "bubble",
+            "area", "donut", "horizontal", "vertical", "stacked",
 
-            # Colors
+            # Colors - expanded
             "color", "colour", "blue", "red", "green", "yellow", "orange", "purple",
             "black", "white", "pink", "cyan", "magenta", "gray", "grey", "brown",
+            "teal", "indigo", "violet", "lime", "amber", "emerald", "sky", "rose",
+            "dark", "light", "brighter", "darker", "colorful", "monochrome",
 
-            # Actions
+            # Actions - expanded
             "make it", "show as", "change to", "convert", "modify", "update",
+            "switch to", "turn into", "transform", "display as", "render as",
+            "can you", "could you", "please", "want it", "i want", "i'd like",
+            "should be", "needs to be", "set to", "use",
 
             # Font customization
             "font", "size", "bigger", "smaller", "bold", "arial", "courier",
-            "increase", "decrease", "larger", "family",
+            "increase", "decrease", "larger", "family", "text", "title",
+            "heading", "readable", "thick", "thin",
 
             # Annotations
             "annotation", "label", "marker", "arrow", "highlight", "point to",
+            "mark", "note", "callout", "emphasize",
+
+            # Data labels
+            "data label", "show value", "show number", "display value",
 
             # Layout
             "width", "height", "wider", "taller", "legend", "margin",
+            "spacing", "padding", "compact", "expand",
 
             # Axis
-            "axis", "range", "scale", "grid", "tick", "format"
+            "axis", "range", "scale", "grid", "tick", "format",
+            "x-axis", "y-axis", "horizontal", "vertical",
+
+            # Styling
+            "style", "theme", "look", "appearance", "design"
         ]
 
         message_lower = message.lower()

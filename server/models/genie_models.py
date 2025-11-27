@@ -64,6 +64,16 @@ class AxisConfig(BaseModel):
     )
     range: Optional[List[float]] = Field(None, description="Axis range [min, max]")
     tickFormat: Optional[str] = Field(None, description="Tick format string (e.g., '.2f', '$,.0f')")
+    numberFormat: Optional[str] = Field(
+        None,
+        description="Human-readable number format: 'billions', 'millions', 'thousands', 'percentage', 'currency', 'compact'. Frontend interprets this to scale and format values correctly."
+    )
+    decimals: Optional[int] = Field(
+        None,
+        ge=0,  # Greater than or equal to 0
+        le=4,  # Less than or equal to 4
+        description="Number of decimal places to show (0-4). Works with numberFormat."
+    )
     showGrid: Optional[bool] = Field(None, description="Show grid lines")
     font: Optional[FontConfig] = Field(None, description="Axis label font configuration")
 
@@ -96,8 +106,28 @@ class LayoutConfig(BaseModel):
     titleFont: Optional[FontConfig] = Field(None, description="Title font configuration")
 
 
+class DataLabelConfig(BaseModel):
+    """Configuration for data labels on charts."""
+
+    show: bool = Field(default=False, description="Show data labels")
+    position: Optional[str] = Field(
+        "auto",
+        description="Label position: 'auto', 'inside', 'outside', 'top', 'bottom'"
+    )
+    format: Optional[str] = Field(None, description="Format string for label values (e.g., '$,.0f')")
+    font: Optional[FontConfig] = Field(None, description="Label font configuration")
+
+
 class VisualizationSpec(BaseModel):
-    """AI-generated visualization specification with advanced customization."""
+    """AI-generated visualization specification with advanced customization.
+
+    Supports two modes:
+    1. Structured mode: Use chartType, xAxis, yAxis, etc. for simple charts
+    2. Raw Plotly mode: Use plotlyData and plotlyLayout for ANY Plotly feature
+
+    When plotlyData/plotlyLayout are provided, they take precedence over
+    structured fields, allowing unlimited customization via natural language.
+    """
 
     chartType: str = Field(
         ...,
@@ -121,9 +151,22 @@ class VisualizationSpec(BaseModel):
         None,
         description="Chart layout configuration (size, margins, legend)"
     )
+    dataLabels: Optional[DataLabelConfig] = Field(
+        None,
+        description="Data label configuration for showing values on chart"
+    )
     reasoning: Optional[str] = Field(
         None,
         description="AI's explanation for why this chart type was chosen"
+    )
+    # Raw Plotly configuration - takes precedence when provided
+    plotlyData: Optional[List[Dict[str, Any]]] = Field(
+        None,
+        description="Raw Plotly trace data array. When provided, used directly instead of structured fields. Supports ANY valid Plotly.js trace configuration."
+    )
+    plotlyLayout: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Raw Plotly layout object. When provided, used directly instead of structured fields. Supports ANY valid Plotly.js layout configuration."
     )
 
 
