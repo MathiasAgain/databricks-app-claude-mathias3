@@ -11,6 +11,7 @@ from server.models.genie_models import (
     QueryResults,
     GenieResponse,
     SuggestedQuestion,
+    VisualizationSpec,
 )
 
 from server.models.claude_models import (
@@ -30,6 +31,7 @@ __all__ = [
     "QueryResults",
     "GenieResponse",
     "SuggestedQuestion",
+    "VisualizationSpec",
     # Claude models
     "ConversationContext",
     "ChatRequest",
